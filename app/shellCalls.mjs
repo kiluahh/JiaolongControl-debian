@@ -71,6 +71,23 @@ export function parseWpctlVolume(text) {
   return {Volume: Math.round(Math.max(0, raw) * 100), Muted: Boolean(m[2])}
 }
 
+/**
+ * 音量操作串行化。
+ * 拖动滑条时前端会连续发多条 SetVolume；若并发执行，
+ * "设 A → 设 B → 回读" 会读到 B 的值，把 A 误判成"回读不一致"。
+ * 串起来跑（每次 set + 回读完整结束再跑下一条）即可消除这种自造失败。
+ */
+let volumeQueue = Promise.resolve()
+
+function serialVolume(task) {
+  const next = volumeQueue.then(task, task)
+  volumeQueue = next.then(
+    () => undefined,
+    () => undefined,
+  )
+  return next
+}
+
 async function readVolume({runWpctl: run}) {
   if (typeof run !== 'function') return null
   const res = await run(['get-volume', VOLUME_SINK])
@@ -205,8 +222,8 @@ export async function handleShellCall(group, method, args, deps = {}) {
   if (group === 'SystemInfo' && method === 'OpenUrl') return openUrl(args, deps)
   if (group === 'Osd' && method === 'GetLockStates') return getLockStates(deps)
   if (group === 'Osd' && method === 'SetTouchpadLock') return setTouchpadLock(args, deps)
-  if (group === 'Osd' && method === 'GetVolume') return getVolume(deps)
-  if (group === 'Osd' && method === 'SetVolume') return setVolume(args, deps)
-  if (group === 'Osd' && method === 'SetMute') return setMute(args, deps)
+  if (group === 'Osd' && method === 'GetVolume') return serialVolume(() => getVolume(deps))
+  if (group === 'Osd' && method === 'SetVolume') return serialVolume(() => setVolume(args, deps))
+  if (group === 'Osd' && method === 'SetMute') return serialVolume(() => setMute(args, deps))
   return null
 }

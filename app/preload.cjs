@@ -13,16 +13,34 @@ const {createBridge} = require('./shim.cjs')
 
 const memo = new Map()
 
+/**
+ * 这些方法不能命中 1s 去重缓存：它们的用途是"读回刚写入的状态"，
+ * 命中缓存会拿到旧值，表现为音量滑条回弹、键盘开关状态与实际相反。
+ */
+const NO_MEMO = new Set([
+  'Osd.GetVolume',
+  'Osd.GetLockStates',
+  'Keyboard.GetColor',
+  'Keyboard.GetLightBrightness',
+  'KeyboardGradient.IsRunning',
+])
+
 function invoke(group, method, args) {
-  const key = `${group}.${method}:${JSON.stringify(args)}`
+  const name = `${group}.${method}`
+  const key = `${name}:${JSON.stringify(args)}`
+  if (NO_MEMO.has(name)) return runInvoke(name, key, group, method, args)
   if (memo.has(key)) return memo.get(key)
-  const p = ipcRenderer.invoke('jlc:call', {group, method, args}).then(
-    (res) => JSON.stringify(res ?? {Success: false, Message: '空响应'}),
-    (e) => JSON.stringify({Success: false, Message: String(e?.message ?? e)}),
-  )
+  const p = runInvoke(name, key, group, method, args)
   memo.set(key, p)
   setTimeout(() => memo.delete(key), 1000) // 与前端 1s 缓存语义一致
   return p
+}
+
+function runInvoke(name, key, group, method, args) {
+  return ipcRenderer.invoke('jlc:call', {group, method, args}).then(
+    (res) => JSON.stringify(res ?? {Success: false, Message: '空响应'}),
+    (e) => JSON.stringify({Success: false, Message: String(e?.message ?? e)}),
+  )
 }
 
 const bridgeProxy = createBridge(invoke)

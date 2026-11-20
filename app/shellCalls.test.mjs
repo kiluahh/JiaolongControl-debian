@@ -287,3 +287,58 @@ test('SetMute：回读不一致要报失败', async () => {
   assert.equal(res.Success, false)
   assert.match(res.Message, /回读不一致/)
 })
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/** 带延迟的 wpctl 假实现：用来复现"拖动滑条时命令交错"的竞态 */
+function slowWpctl({volume = 0.5, muted = false, setMs = 12, getMs = 4} = {}) {
+  const state = {volume, muted, calls: []}
+  const runWpctl = async (args) => {
+    state.calls.push(args)
+    if (args[0] === 'get-volume') {
+      await delay(getMs)
+      return {ok: true, stdout: `Volume: ${state.volume.toFixed(2)}${state.muted ? ' [MUTED]' : ''}`}
+    }
+    if (args[0] === 'set-volume') {
+      await delay(setMs)
+      state.volume = Number(String(args[2]).replace('%', '')) / 100
+      return {ok: true, stdout: ''}
+    }
+    if (args[0] === 'set-mute') {
+      await delay(setMs)
+      state.muted = args[2] === '1'
+      return {ok: true, stdout: ''}
+    }
+    return {ok: false, stderr: `未知子命令 ${args[0]}`}
+  }
+  return {state, runWpctl}
+}
+
+test('SetVolume：连续拖动（并发调用）不会误判回读不一致', async () => {
+  const {state, runWpctl} = slowWpctl({volume: 0.5})
+  const results = await Promise.all(
+    [96, 93, 90].map((v) => handleShellCall('Osd', 'SetVolume', [v], {runWpctl})),
+  )
+  assert.deepEqual(
+    results.map((r) => r.Success),
+    [true, true, true],
+    `三条都该成功，实际: ${JSON.stringify(results.map((r) => r.Message))}`,
+  )
+  assert.equal(Math.round(state.volume * 100), 90, '最终音量应为最后一条')
+  // 串行化后调用序列必须成对出现：set → get → set → get …
+  assert.deepEqual(
+    state.calls.map((c) => c[0]),
+    ['set-volume', 'get-volume', 'set-volume', 'get-volume', 'set-volume', 'get-volume'],
+  )
+})
+
+test('SetVolume 与 GetVolume 之间也保持顺序（读到的永远是写完的值）', async () => {
+  const {runWpctl} = slowWpctl({volume: 0.2})
+  const [setRes, getRes] = await Promise.all([
+    handleShellCall('Osd', 'SetVolume', [77], {runWpctl}),
+    handleShellCall('Osd', 'GetVolume', [], {runWpctl}),
+  ])
+  assert.equal(setRes.Success, true)
+  assert.equal(getRes.Success, true)
+  assert.equal(getRes.Data.Volume, 77, 'GetVolume 排在 SetVolume 之后，应读到新值')
+})
