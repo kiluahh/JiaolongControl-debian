@@ -9,6 +9,7 @@ import {nvidia} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
 import {ledStates, readLedEntries} from './hw/locks.mjs'
 import * as smu from './hw/smu.mjs'
+import {createPowerSampler} from './hw/rapl.mjs'
 import {
   LEVEL_MAX,
   decodeBrightness,
@@ -22,6 +23,9 @@ import {
 } from './hw/kbc.mjs'
 
 const ec = new Ec()
+// RAPL 整包功耗采样器：energy_uj 只有 root 可读，daemon 正好是 root。
+// 非 root 试跑时 sample() 返回 null，前端显示 0（与之前一致）。
+const powerSampler = createPowerSampler()
 
 const ok = (Data, Message = '成功') => ({Success: true, Message, Data})
 const fail = (Message) => ({Success: false, Message})
@@ -412,7 +416,8 @@ export const methods = {
     GetSmuTelemetry: () =>
       ecGuard(() => {
         const temp = ec.tryRead(REG.CPU_TEMP, 0)
-        return ok({Ppt: 0, Temp: temp, FreqMhz: sys.cpuFreqMhz(), Usage: sys.cpuUsage()})
+        // Ppt = RAPL 实测整包功耗（第一次调用只建立基线，返回 0）
+        return ok({Ppt: powerSampler.sample() ?? 0, Temp: temp, FreqMhz: sys.cpuFreqMhz(), Usage: sys.cpuUsage()})
       }, 'SMU 遥测'),
 
     SetStapmLimit: (watts) => smuSet('stapmLimit', Number(watts) * 1000, `STAPM 限值 ${watts}W`),
