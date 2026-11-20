@@ -43,16 +43,14 @@ Vue (client/)  ──window.chrome.webview.hostObjects.bridge──▶  app/ (El
 
 ## 快速试跑
 
-```bash
-# 终端 1：daemon（需要 root 才能读 /proc/acpi/call）
-sudo node daemon/index.mjs --socket=/tmp/jlc.sock --dev
+一个命令搞定（会提示输入一次 sudo 密码）：
 
-# 终端 2：外壳（--dev 让 socket 是 0666，普通用户可连）
-cd client && npx vite build && cd ..
-JLC_SOCKET=/tmp/jlc.sock ./app/node_modules/.bin/electron app
+```bash
+./run.sh
 ```
 
-`--no-sandbox` 视系统策略而定（若报 SUID sandbox 错误就加上）。
+若 Electron 报 SUID sandbox 错误：`./run.sh --no-sandbox`。
+停止后台 daemon：`sudo pkill -f daemon/index.mjs`。
 
 正式安装（systemd 服务 + `/opt/jiaolong`）：
 
@@ -84,7 +82,7 @@ client/            Vue 前端（来自上游，仅改 vite base 与 outDir）
 app/               Electron 外壳 + WebView2 兼容 shim
 daemon/            root 守护进程（EC/sysfs/NVIDIA + JSON-RPC）
 probe/             只读探针与可回滚写入测试
-upstream-windows/  上游 Windows 版快照（协议参考）
+reference/         上游快照（协议参考，不参与构建）
 docs/superpowers/specs/   设计与实测记录
 ```
 
