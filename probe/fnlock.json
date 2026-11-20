@@ -1,0 +1,28 @@
+{
+  "reg": "0x074e",
+  "mask": "0x10",
+  "original": "0x00",
+  "eventNode": "/dev/input/event0",
+  "steps": {
+    "baseline": {
+      "codes": [
+        64
+      ],
+      "mode": "function",
+      "bit4": 0
+    },
+    "hotkey": {
+      "before": "0x00",
+      "after": "0x00",
+      "changed": [],
+      "codes": [
+        64
+      ],
+      "mode": "function",
+      "bitFlipped": false,
+      "modeFlipped": false
+    }
+  },
+  "pass": false,
+  "conclusion": "Fn+Esc 没有同时改变 0x074e bit4 和按键码 —— 位置不对或热键不是 Fn+Esc，未做写入"
+}
