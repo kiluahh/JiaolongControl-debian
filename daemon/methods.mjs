@@ -311,8 +311,8 @@ export const methods = {
 
   Power: {
     SetCPUMaxFrequency: (mhz) => {
-      const want = Number(mhz)
-      if (!Number.isFinite(want) || want <= 0) return fail(`频率值无效: ${mhz}`)
+      let want = Number(mhz)
+      if (!Number.isFinite(want) || want < 0) return fail(`频率值无效: ${mhz}`)
       const base = '/sys/devices/system/cpu/cpufreq'
       const readNum = (f) => {
         try {
@@ -329,6 +329,8 @@ export const methods = {
       }
       if (!policies.length) return fail('没有找到 cpufreq policy')
 
+      // 0 表示"不限制"：取该策略的硬件上限
+      const resolved = want > 0 ? want : Math.round((readNum(`${base}/policy0/cpuinfo_max_freq`) ?? 5385000) / 1000)
       const results = []
       for (const p of policies) {
         const dir = `${base}/${p}`
@@ -342,7 +344,7 @@ export const methods = {
           // 钳到硬件范围，否则 amd-pstate 会 EINVAL
           const infoMax = readNum(`${dir}/cpuinfo_max_freq`)
           const infoMin = readNum(`${dir}/cpuinfo_min_freq`)
-          let target = Math.round(want * 1000)
+          let target = Math.round(resolved * 1000)
           if (infoMax && target > infoMax) target = infoMax
           if (infoMin && target < infoMin) target = infoMin
           // 目标低于当前 min 时先降 min，否则 EINVAL
@@ -359,7 +361,8 @@ export const methods = {
       const failed = results.filter((r) => !r.ok)
       if (!okCount) return fail(`全部策略写入失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}`)
       const note = failed.length ? `（${failed.length}/${results.length} 个策略失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}）` : ''
-      return ok(undefined, `最大频率已设为 ${Math.round(want)}MHz${note}`)
+      const label = Number(mhz) > 0 ? `${Math.round(resolved)}MHz` : `自动（上限 ${Math.round(resolved)}MHz）`
+      return ok(undefined, `最大频率已设为 ${label}${note}`)
     },
     DisableTurbo: () => setBoost(false),
     EnableTurbo: () => setBoost(true),

@@ -30,10 +30,10 @@ export const DEFAULTS = {
   },
   Cpu: {
     CpuProfile: 'default',
-    Default: cpuProfile(55, 75, 95, 0, true),
-    Performance: cpuProfile(75, 90, 95, 0, true),
-    Saving: cpuProfile(35, 45, 90, 0, false),
-    Custom: cpuProfile(55, 75, 95, 0, true),
+    Default: cpuProfile(55, 75, 95, 4400, true),
+    Performance: cpuProfile(75, 90, 95, 4700, true),
+    Saving: cpuProfile(35, 45, 90, 3800, false),
+    Custom: cpuProfile(55, 75, 95, 4800, true),
   },
   Gpu: {GpuClock: 0, MemoryClock: 0, CoreClockOffsetMhz: 0, MemoryClockOffsetMhz: 0},
   Fan: {
@@ -107,6 +107,8 @@ function deepMerge(base, patch) {
 
 let cached = null
 
+const PROFILES = ['Default', 'Performance', 'Saving', 'Custom']
+
 export function loadConfig() {
   if (cached) return cached
   try {
@@ -114,6 +116,13 @@ export function loadConfig() {
     cached = deepMerge(DEFAULTS, raw)
   } catch {
     cached = structuredClone(DEFAULTS)
+  }
+  // 迁移：早期版本把 CpuMaxFrequency 留成 0，等于"每次应用都失败"，这里补成出厂值
+  for (const name of PROFILES) {
+    const profile = cached.Cpu?.[name]
+    if (profile && !Number(profile.CpuMaxFrequency)) {
+      profile.CpuMaxFrequency = DEFAULTS.Cpu[name].CpuMaxFrequency
+    }
   }
   return cached
 }
