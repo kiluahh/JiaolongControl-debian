@@ -9,24 +9,37 @@ export const readText = (p, dflt = null) => {
   }
 }
 
-export function cpuTempC() {
-  for (const h of (readText('/sys/class/hwmon', '') || '').split('\n').filter(Boolean)) {
-    const base = `/sys/class/hwmon/${h}`
-    if (readText(`${base}/name`) !== 'k10temp') continue
-    const v = Number(readText(`${base}/temp1_input`))
+/**
+ * 按 hwmon 名称读 temp1_input（℃）。
+ * 注意：/sys/class/hwmon 是目录，必须 readdirSync；早先误用 readText 读目录
+ * （EISDIR → 空串）导致温度恒为 null。
+ */
+export function hwmonTempC(name, root = '/sys/class/hwmon') {
+  let entries
+  try {
+    entries = fs.readdirSync(root)
+  } catch {
+    return null
+  }
+  for (const entry of entries) {
+    const base = `${root}/${entry}`
+    if (readText(`${base}/name`) !== name) continue
+    // 注意：readText 失败返回 null，Number(null) 是 0 —— 必须先判 null，
+    // 否则读不到温度时会返回 0℃ 这种假数据
+    const raw = readText(`${base}/temp1_input`)
+    if (raw === null || raw === '') continue
+    const v = Number(raw)
     if (Number.isFinite(v)) return Math.round(v / 1000)
   }
   return null
 }
 
-export function gpuTempAmd() {
-  for (const h of (readText('/sys/class/hwmon', '') || '').split('\n').filter(Boolean)) {
-    const base = `/sys/class/hwmon/${h}`
-    if (readText(`${base}/name`) !== 'amdgpu') continue
-    const v = Number(readText(`${base}/temp1_input`))
-    if (Number.isFinite(v)) return Math.round(v / 1000)
-  }
-  return null
+export function cpuTempC(root) {
+  return hwmonTempC('k10temp', root)
+}
+
+export function gpuTempAmd(root) {
+  return hwmonTempC('amdgpu', root)
 }
 
 export function cpuFreqMhz() {

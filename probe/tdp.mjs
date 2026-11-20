@@ -29,7 +29,8 @@ import {spawn} from 'node:child_process'
 import * as smu from '../daemon/hw/smu.mjs'
 import {createPowerSampler} from '../daemon/hw/rapl.mjs'
 import {loadConfig} from '../daemon/hw/config.mjs'
-import {cpuTempC} from '../daemon/hw/sysfs.mjs'
+import {cpuTempC, cpuUsage} from '../daemon/hw/sysfs.mjs'
+import {Ec, REG, MODE_BIT, CUME_BIT} from '../daemon/ec.mjs'
 
 const OUT = path.join(import.meta.dirname, 'tdp.json')
 const argv = process.argv.slice(2)
@@ -106,6 +107,61 @@ function setLongShort(longW, shortW) {
   return results
 }
 
+// ── 频率上限与性能档 ────────────────────────────────────────────────────────
+const CPUFREQ = '/sys/devices/system/cpu/cpufreq'
+
+/** 所有 policy 的 scaling_max_freq 与硬件上限（kHz） */
+function freqCap() {
+  let cur = 0
+  let hw = 0
+  let policies = 0
+  let entries
+  try {
+    entries = fs.readdirSync(CPUFREQ)
+  } catch {
+    return {cur: 0, hw: 0, policies: 0}
+  }
+  for (const entry of entries) {
+    if (!/^policy\d+$/.test(entry)) continue
+    const c = Number(fs.readFileSync(`${CPUFREQ}/${entry}/scaling_max_freq`, 'utf8').trim())
+    const h = Number(fs.readFileSync(`${CPUFREQ}/${entry}/cpuinfo_max_freq`, 'utf8').trim())
+    if (Number.isFinite(c)) cur = Math.max(cur, c)
+    if (Number.isFinite(h)) hw = Math.max(hw, h)
+    policies++
+  }
+  return {cur, hw, policies}
+}
+
+/** 把所有 policy 的 scaling_max_freq 写成同一个值 */
+function setMaxFreqAll(khz) {
+  const out = []
+  for (const entry of fs.readdirSync(CPUFREQ)) {
+    if (!/^policy\d+$/.test(entry)) continue
+    try {
+      fs.writeFileSync(`${CPUFREQ}/${entry}/scaling_max_freq`, String(khz))
+      out.push({policy: entry, ok: true})
+    } catch (e) {
+      out.push({policy: entry, ok: false, message: e.message})
+    }
+  }
+  return out
+}
+
+/** EC 里当前性能档（平衡/性能/安静/自定义），只读 */
+function readPerfMode(ec) {
+  try {
+    const m = ec.readByte(REG.MODE)
+    const c = ec.readByte(REG.CUME)
+    const raw = `0x0751=0x${m.toString(16).padStart(2, '0')} 0x0727=0x${c.toString(16).padStart(2, '0')}`
+    if (c & CUME_BIT) return {label: '自定义档', raw}
+    if (m & MODE_BIT.TBME) return {label: '性能档', raw}
+    if (m & MODE_BIT.UFME) return {label: '安静档', raw}
+    return {label: '平衡档', raw}
+  } catch (e) {
+    return {label: '读不到', raw: e.message}
+  }
+}
+
 // ── 采样 ────────────────────────────────────────────────────────────────────
 function avgFreqMhz() {
   const base = '/sys/devices/system/cpu'
@@ -153,7 +209,7 @@ async function samplePhase(sampler, stopLoad) {
     await sleep(500)
     const w = sampler.sample()
     if (w === null) continue
-    raw.push({w, freq: avgFreqMhz(), temp: cpuTempC()})
+    raw.push({w, freq: avgFreqMhz(), temp: cpuTempC(), usage: cpuUsage()})
   }
   if (stopLoad) stopLoad()
   const steady = raw.slice(2)
@@ -167,6 +223,7 @@ async function samplePhase(sampler, stopLoad) {
     wattsMax: steady.length ? Math.max(...steady.map((x) => x.w)) : null,
     freqAvgMhz: avg(steady, 'freq') === null ? null : Math.round(avg(steady, 'freq')),
     tempAvgC: avg(steady, 'temp') === null ? null : Math.round(avg(steady, 'temp')),
+    usageAvgPct: avg(steady, 'usage') === null ? null : Math.round(avg(steady, 'usage')),
   }
 }
 
@@ -191,14 +248,36 @@ async function main() {
   }
   log(`RAPL 域: ${sampler.domain}`)
   log(`SMU: ${JSON.stringify(smu.info())}`)
-  log(`限值: 低 ${LOW}W / 高 ${HIGH}W，预热 ${WARMUP_MS / 1000}s，采样 ${SAMPLE_MS / 1000}s\n`)
+  log(`限值: 低 ${LOW}W / 高 ${HIGH}W，预热 ${WARMUP_MS / 1000}s，采样 ${SAMPLE_MS / 1000}s`)
+
+  // 性能档与频率上限：这两者都会盖过 SMU 限值，必须先看清楚
+  const ec = new Ec()
+  const perfMode = readPerfMode(ec)
+  log(`EC 性能档: ${perfMode.label}（${perfMode.raw}）`)
+  const cap0 = freqCap()
+  log(`频率上限: scaling_max_freq=${cap0.cur} kHz / cpuinfo_max_freq=${cap0.hw} kHz`)
+  const cappedLow = cap0.cur > 0 && cap0.hw > 0 && cap0.cur < cap0.hw * 0.95
+  if (cappedLow) {
+    log(`   ⚠ CPU 被限频在 ${(cap0.cur / 1e6).toFixed(2)} GHz，SMU 限值不会成为瓶颈`)
+    log(`     本次测试临时抬到硬件上限 ${(cap0.hw / 1e6).toFixed(2)} GHz，结束恢复`)
+  }
+  log('')
 
   const result = {low: LOW, high: HIGH, domain: sampler.domain, phases: {}, at: new Date().toISOString()}
+  result.perfMode = perfMode
+  result.freqCapBefore = cap0
   const restore = restoreValues()
   result.restore = restore
   let stopLoad = null
   let touched = false
+  let raisedFreqCap = false
   try {
+    if (cappedLow) {
+      const r = setMaxFreqAll(cap0.hw)
+      const bad = r.filter((x) => !x.ok)
+      raisedFreqCap = bad.length === 0
+      log(`[freq] 已把 ${r.length} 个 policy 的上限抬到 ${cap0.hw} kHz${bad.length ? `（${bad.length} 个失败）` : ''}`)
+    }
     // ── 空载基线 ──
     log('== 空载基线 ==')
     sampler.sample() // 建立基线
@@ -218,7 +297,7 @@ async function main() {
     const low = await samplePhase(sampler, stopLoad)
     stopLoad = null
     log(
-      `   实测 ${low.wattsAvg} W（峰值 ${low.wattsMax}）  ${low.freqAvgMhz} MHz  ${low.tempAvgC} ℃  [${low.samples} 样本]`,
+      `   实测 ${low.wattsAvg} W（峰值 ${low.wattsMax}）  ${low.freqAvgMhz} MHz  ${low.tempAvgC} ℃  CPU ${low.usageAvgPct}%  [${low.samples} 样本]`,
     )
     result.phases.low = {target: LOW, ...low}
 
@@ -234,7 +313,7 @@ async function main() {
     const high = await samplePhase(sampler, stopLoad)
     stopLoad = null
     log(
-      `   实测 ${high.wattsAvg} W（峰值 ${high.wattsMax}）  ${high.freqAvgMhz} MHz  ${high.tempAvgC} ℃  [${high.samples} 样本]`,
+      `   实测 ${high.wattsAvg} W（峰值 ${high.wattsMax}）  ${high.freqAvgMhz} MHz  ${high.tempAvgC} ℃  CPU ${high.usageAvgPct}%  [${high.samples} 样本]`,
     )
     result.phases.high = {target: HIGH, ...high}
 
@@ -267,7 +346,10 @@ async function main() {
       result.conclusion = '采样不足'
     } else {
       log(`   ✗ 判定不成立：实测差值 ${delta} W，低限值阶段 ${low.wattsAvg} W（设定 ${LOW}W）`)
-      log('     → SMU 限值可能只被接受、未真正执行（或该平台由别的寄存器生效）')
+      log('     排查顺序：')
+      log(`       1. EC 性能档=${perfMode.label}：平衡/安静档可能由固件限死，切到"性能"再测`)
+      log(`       2. 频率上限=${(cap0.cur / 1e6).toFixed(2)} GHz（硬件 ${(cap0.hw / 1e6).toFixed(2)} GHz）：限频时 TDP 永远不成为瓶颈`)
+      log('       3. 若两者都正常仍无差值 → STAPM/Fast/Slow 只是被 SMU 接受未执行，需换寄存器')
       result.conclusion = `差值 ${delta}W，未通过判据`
     }
     save(result)
@@ -279,6 +361,11 @@ async function main() {
     process.exit(1)
   } finally {
     if (stopLoad) stopLoad()
+    if (raisedFreqCap) {
+      const r = setMaxFreqAll(cap0.cur)
+      const bad = r.filter((x) => !x.ok)
+      log(`[restore] 频率上限已恢复为 ${cap0.cur} kHz${bad.length ? `（${bad.length} 个失败）` : ''}`)
+    }
     if (touched) {
       const restored = setLongShort(restore.long, restore.short)
       const bad = restored.filter((r) => !r.ok)

@@ -1,0 +1,34 @@
+{
+  "low": 45,
+  "high": 75,
+  "domain": "/sys/class/powercap/intel-rapl:0",
+  "phases": {
+    "low": {
+      "target": 45,
+      "samples": 20,
+      "wattsAvg": 28.2,
+      "wattsMax": 29.1,
+      "freqAvgMhz": 2379,
+      "tempAvgC": null
+    },
+    "high": {
+      "target": 75,
+      "samples": 20,
+      "wattsAvg": 27.6,
+      "wattsMax": 27.8,
+      "freqAvgMhz": 2379,
+      "tempAvgC": null
+    }
+  },
+  "at": "2026-11-20T08:42:39.237Z",
+  "restore": {
+    "long": 55,
+    "short": 75,
+    "source": "配置 default"
+  },
+  "idleWatts": 16.8,
+  "delta": -0.5999999999999979,
+  "lowWithinLimit": true,
+  "pass": false,
+  "conclusion": "差值 -0.5999999999999979W，未通过判据"
+}
