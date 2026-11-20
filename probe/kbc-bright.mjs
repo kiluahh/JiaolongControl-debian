@@ -7,6 +7,9 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import readline from 'node:readline/promises'
+
+const STEP_MODE = process.argv.includes('--step')
 
 const CALL = '/proc/acpi/call'
 const REG = {BL: 0x078c, MODE: 0x0767}
@@ -36,13 +39,19 @@ if (process.getuid?.() !== 0) {
 const saved = ecRead(REG.BL)
 console.log(`当前 0x078c = ${hex(saved)}，mode=${hex(ecRead(REG.MODE))}\n`)
 
+if (STEP_MODE) console.log('交互模式：每次按回车进入下一档，看清当前亮度后再按。\n')
+const rl = STEP_MODE ? readline.createInterface({input: process.stdin, output: process.stdout}) : null
+
 for (let i = 0; i < STEPS.length; i++) {
   const s = STEPS[i]
+  if (rl) await rl.question(`按回车 → 写入 ${hex(s.v)}（${s.why}）`)
   ecWrite(REG.BL, s.v)
-  await sleep(3000)
+  if (rl) await rl.question(`   已写入 ${hex(s.v)}，看清后按回车继续`)
+  else await sleep(3000)
   const back = ecRead(REG.BL)
   console.log(`步骤 ${i + 1}/${STEPS.length}  写 ${hex(s.v)}（${s.why}） → 回读 ${hex(back)}${back === s.v ? ' 保持' : ' 被改写'}`)
 }
+if (rl) rl.close()
 
 ecWrite(REG.BL, saved)
 console.log(`\n已恢复 0x078c = ${hex(saved)}`)
