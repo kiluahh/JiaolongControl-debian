@@ -2,6 +2,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import {migrateFanConfig} from './fan.mjs'
+
 const FILE = process.env.JLC_CONFIG || '/etc/jlc/config.json'
 
 const cpuProfile = (longPower, shortPower, tempWall, maxFreq, turbo) => ({
@@ -36,21 +38,18 @@ export const DEFAULTS = {
   },
   Gpu: {GpuClock: 0, MemoryClock: 0, CoreClockOffsetMhz: 0, MemoryClockOffsetMhz: 0},
   Fan: {
+    // 转速口径统一为 RPM（与前端 Fan 页滑条、风扇曲线编辑器一致）
     FanCurveMerge: true,
-    ManualFanSpeed: 50,
+    ManualFanSpeed: 3000,
     CpuFanCurve: [
-      {temp: 30, speed: 0},
-      {temp: 50, speed: 30},
-      {temp: 70, speed: 60},
-      {temp: 85, speed: 85},
-      {temp: 95, speed: 100},
+      {temp: 60, speed: 1500},
+      {temp: 80, speed: 3000},
+      {temp: 100, speed: 5800},
     ],
     GpuFanCurve: [
-      {temp: 30, speed: 0},
-      {temp: 55, speed: 30},
-      {temp: 70, speed: 60},
-      {temp: 85, speed: 85},
-      {temp: 95, speed: 100},
+      {temp: 60, speed: 1500},
+      {temp: 75, speed: 3000},
+      {temp: 87, speed: 5800},
     ],
   },
   Smu: {
@@ -116,6 +115,11 @@ export function loadConfig() {
   } catch {
     cached = structuredClone(DEFAULTS)
   }
+  // 迁移：风扇曲线/手动转速的旧口径是百分比 0..100，现在统一为 RPM。
+  // 不迁移的话 95℃ 只会算出 100 RPM ≈ 3/200 占空比，风扇基本不转。
+  const fan = migrateFanConfig(cached.Fan)
+  if (fan.migrated) cached.Fan = fan.fan
+
   // 迁移：早期版本把 CpuMaxFrequency 留成 0，等于"每次应用都失败"，这里补成出厂值
   for (const name of PROFILES) {
     const profile = cached.Cpu?.[name]
@@ -127,7 +131,9 @@ export function loadConfig() {
 }
 
 export function saveConfig(patch) {
-  const next = deepMerge(loadConfig(), patch ?? {})
+  let next = deepMerge(loadConfig(), patch ?? {})
+  const fan = migrateFanConfig(next.Fan)
+  if (fan.migrated) next = {...next, Fan: fan.fan}
   fs.mkdirSync(path.dirname(FILE), {recursive: true})
   fs.writeFileSync(FILE, JSON.stringify(next, null, 2) + '\n')
   cached = next

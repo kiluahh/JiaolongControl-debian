@@ -10,6 +10,7 @@ import {loadConfig, saveConfig} from './hw/config.mjs'
 import {ledStates, readLedEntries} from './hw/locks.mjs'
 import * as smu from './hw/smu.mjs'
 import {createPowerSampler} from './hw/rapl.mjs'
+import {FAN_MAX_RPM, curveRpm, rpmToDuty} from './hw/fan.mjs'
 import {
   LEVEL_MAX,
   decodeBrightness,
@@ -30,8 +31,6 @@ const powerSampler = createPowerSampler()
 const ok = (Data, Message = '成功') => ({Success: true, Message, Data})
 const fail = (Message) => ({Success: false, Message})
 
-const MAX_RPM_BYTE = 68 // 上游约定：1 byte = 100 RPM
-const rpmByteToDuty = (b) => Math.max(0, Math.min(FAN_DUTY_MAX, Math.round((b / MAX_RPM_BYTE) * FAN_DUTY_MAX)))
 
 function ecGuard(fn, label) {
   try {
@@ -66,15 +65,11 @@ const autoFan = {
   tick() {
     if (!ec.available) return
     const cfg = loadConfig()
-    const manual = Number(cfg.Fan?.ManualFanSpeed ?? 0) // 0..100
-    const temp = ec.tryRead(REG.CPU_TEMP, sys.cpuTempC() ?? 0)
-    const curve = cfg.Fan?.CpuFanCurve ?? []
-    let pct = manual
-    if (curve.length >= 2) {
-      pct = interpolate(curve, temp)
-    }
-    this.target = Math.max(0, Math.min(100, Math.round(pct)))
-    const duty = Math.round((this.target / 100) * FAN_DUTY_MAX)
+    // 曲线与手动转速都是 RPM（前端 Fan 页 0..8000、曲线编辑器 1500..6800），
+    // 由 curveRpm 统一插值，再由 rpmToDuty 折算成 0..200 的占空比。
+    const rpm = curveRpm(cfg.Fan?.CpuFanCurve, ec.tryRead(REG.CPU_TEMP, sys.cpuTempC() ?? 0), Number(cfg.Fan?.ManualFanSpeed ?? 0))
+    this.target = rpm
+    const duty = rpmToDuty(rpm)
     ec.writeByte(REG.DUTY_CPU, duty)
     if (cfg.Fan?.FanCurveMerge) ec.writeByte(REG.DUTY_GPU, duty)
     ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, true)
@@ -130,13 +125,14 @@ export const methods = {
         // 注意：上游 FanController 把 item2 映射为 CPU、item1 为 GPU，此处直接按本机布局返回
         return ok({CPUFanSpeed: cpu, GPUFanSpeed: gpu})
       }, '风扇转速'),
-    SetFanSpeed: (fanByte) =>
+    // 前端传的是目标转速 RPM（Fan.vue 滑条 0..8000）
+    SetFanSpeed: (rpm) =>
       ecGuard(() => {
-        const duty = rpmByteToDuty(Number(fanByte) || 0)
+        const duty = rpmToDuty(Number(rpm) || 0)
         ec.writeByte(REG.DUTY_CPU, duty)
         ec.writeByte(REG.DUTY_GPU, duty)
         ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, true)
-        return ok(undefined, `已设为 ${Math.round((duty / FAN_DUTY_MAX) * 100)}%`)
+        return ok({Rpm: Number(rpm) || 0, Duty: duty}, `已设为 ${Number(rpm) || 0} RPM（占空比 ${duty}/${FAN_DUTY_MAX}）`)
       }, '设置风扇'),
     RemoveFanSpeed: () =>
       ecGuard(() => {
