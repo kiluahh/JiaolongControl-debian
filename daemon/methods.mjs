@@ -7,6 +7,7 @@ import {Ec, REG, MODE_BIT, CUME_BIT, FAN_DUTY_MAX, applyPerformanceMode} from '.
 import * as sys from './hw/sysfs.mjs'
 import {nvidia} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
+import {ledStates, readLedEntries} from './hw/locks.mjs'
 import * as smu from './hw/smu.mjs'
 import {
   LEVEL_MAX,
@@ -448,7 +449,14 @@ export const methods = {
     GetVolume: () => volumeGet(),
     SetVolume: (pct) => volumeSet(pct),
     SetMute: (muted) => volumeMute(muted),
-    GetLockStates: () => ok({CapsLock: false, NumLock: false, FnLock: null, TouchpadLock: null}),
+    // CapsLock/NumLock 读键盘 LED 真值；FnLock/触摸板尚未接入（null = 前端显示"未知"）
+    GetLockStates: () => {
+      const led = ledStates(readLedEntries())
+      return ok(
+        {CapsLock: led.CapsLock, NumLock: led.NumLock, FnLock: null, TouchpadLock: null},
+        'CapsLock/NumLock 来自键盘 LED',
+      )
+    },
     SetCapsLock: () => fail('由外壳用 X11/Wayland 接口实现'),
     SetNumLock: () => fail('由外壳用 X11/Wayland 接口实现'),
     SetFnLock: () => fail('Fn 锁寄存器尚未确认'),

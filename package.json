@@ -9,6 +9,6 @@
     "app": "npm --prefix app start",
     "daemon": "node daemon/index.mjs",
     "probe": "node probe/probe.mjs --dry-run",
-    "test": "node --test daemon/hw/kbc.test.mjs app/shellCalls.test.mjs"
+    "test": "node --test daemon/hw/kbc.test.mjs daemon/hw/locks.test.mjs app/shellCalls.test.mjs"
   }
 }
