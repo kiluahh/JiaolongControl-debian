@@ -22,7 +22,7 @@ fi
 echo "==> 启动 daemon（需要 root，会提示输入一次密码）"
 sudo -v
 sudo nohup env JLC_CONFIG="$PWD/.run/config.json" JLC_SOCKET="$SOCK" \
-  node daemon/index.mjs --socket="$SOCK" --dev >"$PWD/.run/daemon.log" 2>&1 &
+  node daemon/index.mjs --socket="$SOCK" --dev --verbose >"$PWD/.run/daemon.log" 2>&1 &
 sleep 2
 
 if ! pgrep -f "daemon/index.mjs" >/dev/null 2>&1; then
@@ -30,7 +30,7 @@ if ! pgrep -f "daemon/index.mjs" >/dev/null 2>&1; then
   tail -20 .run/daemon.log >&2
   exit 1
 fi
-echo "==> daemon 就绪：$SOCK"
+echo "==> daemon 就绪：$SOCK（调用日志：.run/daemon.log）"
 
 echo "==> 启动界面"
 JLC_SOCKET="$SOCK" exec ./app/node_modules/.bin/electron app "$@"
