@@ -18,6 +18,9 @@ const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 const TOUCHPAD_SCHEMA = 'org.gnome.desktop.peripherals.touchpad'
 const TOUCHPAD_KEY = 'send-events'
 
+/** PipeWire/WirePlumber 默认输出设备；音量键作用的就是它 */
+const VOLUME_SINK = '@DEFAULT_AUDIO_SINK@'
+
 /** 校验并归一化 URL，只放行 http/https（避免 file:// / javascript: 之类的越权打开） */
 export function normalizeUrl(raw) {
   const url = String(raw ?? '').trim()
@@ -42,6 +45,72 @@ export async function runGsettings(args) {
   } catch (e) {
     return {ok: false, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? String(e)}
   }
+}
+
+/** 默认的 wpctl 执行器：以当前用户身份调用 PipeWire 控制台 */
+export async function runWpctl(args) {
+  try {
+    const {stdout, stderr} = await execFileAsync('wpctl', args, {timeout: 2000})
+    return {ok: true, stdout, stderr}
+  } catch (e) {
+    return {ok: false, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? String(e)}
+  }
+}
+
+/**
+ * 解析 `wpctl get-volume` 的输出：
+ *   "Volume: 0.70"        → {Volume: 70, Muted: false}
+ *   "Volume: 0.00 [MUTED]" → {Volume: 0, Muted: true}
+ * 解析不出来返回 null（宁可报错，也不要拿 0 冒充音量）。
+ */
+export function parseWpctlVolume(text) {
+  const m = String(text ?? '').match(/Volume:\s*([0-9]*\.?[0-9]+)(\s*\[MUTED\])?/i)
+  if (!m) return null
+  const raw = Number(m[1])
+  if (!Number.isFinite(raw)) return null
+  return {Volume: Math.round(Math.max(0, raw) * 100), Muted: Boolean(m[2])}
+}
+
+async function readVolume({runWpctl: run}) {
+  if (typeof run !== 'function') return null
+  const res = await run(['get-volume', VOLUME_SINK])
+  if (!res?.ok) return null
+  return parseWpctlVolume(res.stdout)
+}
+
+async function getVolume(deps) {
+  const state = await readVolume(deps)
+  if (!state) return {Success: false, Message: '读不到系统音量（wpctl 不可用）'}
+  return {Success: true, Message: '系统音量', Data: state}
+}
+
+async function setVolume(args, {runWpctl: run}) {
+  if (typeof run !== 'function') return {Success: false, Message: '外壳未提供 wpctl 执行器'}
+  const raw = Number(args?.[0])
+  if (!Number.isFinite(raw)) return {Success: false, Message: `音量值无效: ${args?.[0]}`}
+  const pct = Math.max(0, Math.min(100, Math.round(raw)))
+  const res = await run(['set-volume', VOLUME_SINK, `${pct}%`])
+  if (!res?.ok) return {Success: false, Message: `设置音量失败: ${String(res?.stderr ?? '').trim()}`}
+  // 回读校验：PipeWire 会话不在、或设备被切走时 wpctl 可能"成功"但没生效
+  const after = await readVolume({runWpctl: run})
+  if (!after) return {Success: false, Message: '设置后读不到音量，无法确认结果'}
+  if (Math.abs(after.Volume - pct) > 1) {
+    return {Success: false, Message: `回读不一致（期望 ${pct}%，实际 ${after.Volume}%）`}
+  }
+  return {Success: true, Message: `音量已设为 ${after.Volume}%`}
+}
+
+async function setMute(args, {runWpctl: run}) {
+  if (typeof run !== 'function') return {Success: false, Message: '外壳未提供 wpctl 执行器'}
+  const want = Boolean(args?.[0])
+  const res = await run(['set-mute', VOLUME_SINK, want ? '1' : '0'])
+  if (!res?.ok) return {Success: false, Message: `设置静音失败: ${String(res?.stderr ?? '').trim()}`}
+  const after = await readVolume({runWpctl: run})
+  if (!after) return {Success: false, Message: '设置后读不到音量，无法确认结果'}
+  if (after.Muted !== want) {
+    return {Success: false, Message: `回读不一致（期望 ${want ? '静音' : '取消静音'}）`}
+  }
+  return {Success: true, Message: want ? '已静音' : '已取消静音'}
 }
 
 /** 解析 `gsettings get` 的输出（'enabled' 带单引号）→ 锁定状态 true/false，读不到返回 null */
@@ -127,6 +196,7 @@ async function setTouchpadLock(args, {runGsettings: run, emit}) {
  *   openExternal?: (url: string) => Promise<unknown>,
  *   callDaemon?: (group: string, method: string, args?: unknown[]) => Promise<any>,
  *   runGsettings?: (args: string[]) => Promise<{ok: boolean, stdout?: string, stderr?: string}>,
+ *   runWpctl?: (args: string[]) => Promise<{ok: boolean, stdout?: string, stderr?: string}>,
  *   emit?: (payload: {type: string} & Record<string, unknown>) => void,
  * }} deps
  * @returns {null | {Success: boolean, Message: string, Data?: unknown}}
@@ -135,5 +205,8 @@ export async function handleShellCall(group, method, args, deps = {}) {
   if (group === 'SystemInfo' && method === 'OpenUrl') return openUrl(args, deps)
   if (group === 'Osd' && method === 'GetLockStates') return getLockStates(deps)
   if (group === 'Osd' && method === 'SetTouchpadLock') return setTouchpadLock(args, deps)
+  if (group === 'Osd' && method === 'GetVolume') return getVolume(deps)
+  if (group === 'Osd' && method === 'SetVolume') return setVolume(args, deps)
+  if (group === 'Osd' && method === 'SetMute') return setMute(args, deps)
   return null
 }

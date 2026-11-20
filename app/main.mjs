@@ -4,7 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {callDaemon, pingDaemon} from './bridge.mjs'
-import {handleShellCall, runGsettings} from './shellCalls.mjs'
+import {handleShellCall, runGsettings, runWpctl} from './shellCalls.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -106,6 +106,7 @@ ipcMain.handle('jlc:call', async (_e, {group, method, args}) => {
     openExternal: (url) => shell.openExternal(url),
     callDaemon,
     runGsettings,
+    runWpctl,
     emit: emitToRenderer,
   })
   if (local) return local

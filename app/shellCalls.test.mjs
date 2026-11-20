@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   handleShellCall,
   normalizeUrl,
+  parseWpctlVolume,
   touchpadLockedFromGsettings,
 } from './shellCalls.mjs'
 
@@ -50,7 +51,7 @@ test('handleShellCall：非外壳方法返回 null（交给 daemon）', async ()
   const openExternal = async (u) => calls.push(u)
   for (const [group, method] of [
     ['CPU', 'GetCpuUsage'],
-    ['Osd', 'SetVolume'],
+    ['Osd', 'ShowTest'],
     ['Osd', 'SetCapsLock'],
     ['SystemInfo', 'GetSystemOverview'],
   ]) {
@@ -188,4 +189,101 @@ test('SetTouchpadLock：写入后回读不一致要报失败，不能假装成�
   assert.equal(res.Success, false)
   assert.match(res.Message, /回读不一致/)
   assert.deepEqual(events, [], '失败时不应推送状态')
+})
+
+// ── 系统音量（wpctl） ───────────────────────────────────────────────────────
+const SINK = '@DEFAULT_AUDIO_SINK@'
+
+/** 模拟 wpctl：记住音量/静音状态，输出格式与真 wpctl 一致 */
+function fakeWpctl({volume = 0.7, muted = false} = {}) {
+  const state = {volume, muted, calls: []}
+  const runWpctl = async (args) => {
+    state.calls.push(args)
+    if (args[0] === 'get-volume') {
+      return {ok: true, stdout: `Volume: ${state.volume.toFixed(2)}${state.muted ? ' [MUTED]' : ''}\n`}
+    }
+    if (args[0] === 'set-volume') {
+      state.volume = Number(String(args[2]).replace('%', '')) / 100
+      return {ok: true, stdout: ''}
+    }
+    if (args[0] === 'set-mute') {
+      state.muted = args[2] === '1'
+      return {ok: true, stdout: ''}
+    }
+    return {ok: false, stderr: `未知子命令 ${args[0]}`}
+  }
+  return {state, runWpctl}
+}
+
+test('parseWpctlVolume：解析音量与静音标记', () => {
+  assert.deepEqual(parseWpctlVolume('Volume: 0.70\n'), {Volume: 70, Muted: false})
+  assert.deepEqual(parseWpctlVolume('Volume: 1.00'), {Volume: 100, Muted: false})
+  assert.deepEqual(parseWpctlVolume('Volume: 0.00 [MUTED]\n'), {Volume: 0, Muted: true})
+  assert.equal(parseWpctlVolume(''), null)
+  assert.equal(parseWpctlVolume(undefined), null)
+  assert.equal(parseWpctlVolume('没有音量字段'), null)
+})
+
+test('GetVolume：返回系统真实音量', async () => {
+  const {runWpctl, state} = fakeWpctl({volume: 0.42, muted: true})
+  const res = await handleShellCall('Osd', 'GetVolume', [], {runWpctl})
+  assert.equal(res.Success, true)
+  assert.deepEqual(res.Data, {Volume: 42, Muted: true})
+  assert.deepEqual(state.calls, [['get-volume', SINK]])
+})
+
+test('GetVolume：wpctl 不可用时明确报错，不返回假 0', async () => {
+  const res = await handleShellCall('Osd', 'GetVolume', [], {
+    runWpctl: async () => ({ok: false, stderr: 'command not found: wpctl'}),
+  })
+  assert.equal(res.Success, false)
+  assert.match(res.Message, /wpctl/)
+  assert.equal(res.Data, undefined)
+})
+
+test('SetVolume：写系统音量并回读确认', async () => {
+  const {state, runWpctl} = fakeWpctl({volume: 0.7})
+  const res = await handleShellCall('Osd', 'SetVolume', [35], {runWpctl})
+  assert.equal(res.Success, true)
+  assert.equal(state.volume, 0.35)
+  assert.deepEqual(state.calls.at(-1), ['get-volume', SINK])
+  assert.match(res.Message, /35%/)
+})
+
+test('SetVolume：越界值夹到 0..100', async () => {
+  const {state, runWpctl} = fakeWpctl({volume: 0.5})
+  const res = await handleShellCall('Osd', 'SetVolume', [150], {runWpctl})
+  assert.equal(res.Success, true)
+  assert.equal(state.volume, 1)
+  assert.equal((await handleShellCall('Osd', 'SetVolume', [-20], {runWpctl})).Success, true)
+  assert.equal(state.volume, 0)
+})
+
+test('SetVolume：回读不一致要报失败，不能假装成功', async () => {
+  // set-volume 退出码 0，但值没变
+  const runWpctl = async (args) =>
+    args[0] === 'get-volume' ? {ok: true, stdout: 'Volume: 0.70'} : {ok: true, stdout: ''}
+  const res = await handleShellCall('Osd', 'SetVolume', [35], {runWpctl})
+  assert.equal(res.Success, false)
+  assert.match(res.Message, /回读不一致/)
+})
+
+test('SetMute：静音与取消静音都回读确认', async () => {
+  const {state, runWpctl} = fakeWpctl({volume: 0.5, muted: false})
+  const on = await handleShellCall('Osd', 'SetMute', [true], {runWpctl})
+  assert.equal(on.Success, true)
+  assert.equal(state.muted, true)
+  assert.match(on.Message, /已静音/)
+
+  const off = await handleShellCall('Osd', 'SetMute', [false], {runWpctl})
+  assert.equal(off.Success, true)
+  assert.equal(state.muted, false)
+})
+
+test('SetMute：回读不一致要报失败', async () => {
+  const runWpctl = async (args) =>
+    args[0] === 'get-volume' ? {ok: true, stdout: 'Volume: 0.50'} : {ok: true, stdout: ''}
+  const res = await handleShellCall('Osd', 'SetMute', [true], {runWpctl})
+  assert.equal(res.Success, false)
+  assert.match(res.Message, /回读不一致/)
 })

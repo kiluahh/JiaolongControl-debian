@@ -69,8 +69,9 @@ sudo ./install.sh
 | 键盘背光 / RGB / 呼吸 | ✅ | `0x078c` bits[7:5]=档位 0–4（0=关，写入须带 apply 位 `0x10`）；`0x0769-6b` RGB 通道 0–50 + `0x0767` 触发；`0x0767` bit7=呼吸。协议取自 TUXEDO GPL 驱动并本机实测复核；逐键 RGB 需 ITE HID，本机无此设备 |
 | 大写/数字锁状态 | ✅ | 读 `/sys/class/leds/input*::capslock\|numlock`；优先内置键盘（`AT Translated Set 2`）——Wayland 下 mutter 只给事件源键盘更新 LED，外接键盘的 LED 可能是脏的。实机验证 `false→true→false` |
 | 触摸板锁 | ✅ | 外壳以用户身份写 `gsettings org.gnome.desktop.peripherals.touchpad send-events`，写入后回读校验，成功后推送 `lock-states-changed` |
-| 大写/数字锁「切换」 | ❌ | 需要注入按键（GNOME Wayland 不支持 wtype 的虚拟键盘协议，得走 ydotool/uinput） |
+| 大写/数字锁「切换」 | ❌ 不做 | 已评估 uinput 虚拟键盘注入方案，决定跳过；面板点击改为提示按物理键 |
 | Fn 锁 | ❌ | 寄存器 `0x074e` bit4（TUXEDO `uniwill_keyboard.h`），本机待验证 |
+| 系统音量 / 静音 | ✅ | 外壳经 `wpctl` 控制默认输出设备（PipeWire），写入后回读校验 |
 | 打开外链 | ✅ | 外壳 `shell.openExternal`，只放行 http/https |
 | logo 灯 | ❌ | 寄存器未确认 |
 | GPU 监控 | ✅ | `nvidia-smi` |
