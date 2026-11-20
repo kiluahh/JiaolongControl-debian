@@ -137,6 +137,8 @@ if (DRY) {
     report.windows.low = readRange(0x0000, 0x00ff)
     report.windows.fan = readRange(0x0400, 0x04ff)
     report.windows.oem = readRange(0x0700, 0x07ff)
+    report.windows.fantable = readRange(0x0f00, 0x0f5f)
+    report.windows.duty = readRange(0x1800, 0x181f)
   }
 
   // ── 判定 ──
