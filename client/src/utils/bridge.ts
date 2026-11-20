@@ -160,11 +160,6 @@ export interface BridgeApi {
     Disable(): HostBridgePromise<void>
     IsEnabled(): HostBridgePromise<boolean>
   }
-  AutoFan: {
-    Start(): HostBridgePromise<void>
-    Stop(): HostBridgePromise<void>
-    IsRunning(): HostBridgePromise<boolean>
-  }
   KeyboardGradient: {
     Start(): HostBridgePromise<void>
     Stop(): HostBridgePromise<void>
@@ -227,7 +222,7 @@ export interface BridgeApi {
     GetSmuTelemetry(): HostBridgePromise<SmuTelemetry>
   }
   Osd: {
-    ShowTest(kind: string, value: number): HostBridgePromise<void>
+    ShowTest(kind: string, value?: number | boolean): HostBridgePromise<void>
     GetVolume(): HostBridgePromise<OsdVolumeState>
     SetVolume(percent: number): HostBridgePromise<void>
     SetMute(muted: boolean): HostBridgePromise<void>
@@ -363,12 +358,6 @@ export const Boot = {
   IsEnabled: () => call(raw.AutoStart.IsEnabled()),
 }
 
-export const AutoFanControl = {
-  Start: () => call(raw.AutoFan.Start()),
-  Stop: () => call(raw.AutoFan.Stop()),
-  IsRunning: () => call(raw.AutoFan.IsRunning()),
-}
-
 export const KeyboardGradient = {
   Start: () => call(raw.KeyboardGradient.Start()),
   Stop: () => call(raw.KeyboardGradient.Stop()),
@@ -463,7 +452,7 @@ export const Power = {
 }
 
 export const Osd = {
-  ShowTest: (kind: string, value = 0) => call(raw.Osd.ShowTest(kind, value)),
+  ShowTest: (kind: string, value: number | boolean = 0) => call(raw.Osd.ShowTest(kind, value)),
   GetVolume: () => call(raw.Osd.GetVolume()),
   SetVolume: (percent: number) => call(raw.Osd.SetVolume(percent)),
   SetMute: (muted: boolean) => call(raw.Osd.SetMute(muted)),

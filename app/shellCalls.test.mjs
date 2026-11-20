@@ -51,13 +51,24 @@ test('handleShellCall：非外壳方法返回 null（交给 daemon）', async ()
   const openExternal = async (u) => calls.push(u)
   for (const [group, method] of [
     ['CPU', 'GetCpuUsage'],
-    ['Osd', 'ShowTest'],
     ['Osd', 'SetCapsLock'],
     ['SystemInfo', 'GetSystemOverview'],
   ]) {
     assert.equal(await handleShellCall(group, method, [], {openExternal}), null)
   }
   assert.deepEqual(calls, [], '非外壳方法不应触发 openExternal')
+})
+
+test('handleShellCall：Osd.ShowTest 交给外壳 OSD 窗口，未实现类型要拒绝', async () => {
+  const shown = []
+  const deps = {osd: {showTest: (kind, value) => (shown.push([kind, value]), kind !== 'media')}}
+  const okRes = await handleShellCall('Osd', 'ShowTest', ['perf', 1], deps)
+  assert.equal(okRes.Success, true)
+  assert.deepEqual(shown, [['perf', 1]])
+
+  const bad = await handleShellCall('Osd', 'ShowTest', ['media'], deps)
+  assert.equal(bad.Success, false)
+  assert.match(bad.Message, /尚未实现/)
 })
 
 test('handleShellCall：OpenUrl 调 openExternal 并返回成功', async () => {

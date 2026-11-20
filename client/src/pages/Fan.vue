@@ -2,7 +2,6 @@
 import {onMounted, ref} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import {Fan} from '@/utils/bridge'
-import {stopAutoFanIfRunning} from '@/utils/fanControl'
 import FanSpeed from '@/components/common/FanSpeed.vue'
 
 const loading = ref(false)
@@ -28,8 +27,6 @@ async function handleToggle(value: string | number | boolean) {
   const want = !!value
   loading.value = true
   try {
-    // 全速开关与自动风扇控制环互斥：先停控制环，避免它把状态写回去
-    await stopAutoFanIfRunning()
     const res = await Fan.SetMaxFanSpeedSwitch(want)
     if (res.Success) {
       Message.success(res.Message)
@@ -51,9 +48,10 @@ onMounted(refresh)
 
 <template>
   <div class="h-full overflow-y-auto text-ink p-6 no-scrollbar">
-    <div class="max-w-[1300px] mx-auto flex flex-col lg:flex-row gap-6">
+    <!-- 侧栏固定 240px: 内容区实际宽度远小于窗口, 故双栏要到 xl(1280) 才启用 -->
+    <div class="max-w-[1300px] mx-auto flex flex-col xl:flex-row gap-6">
       <!-- ==================== 左侧：风扇模式 ==================== -->
-      <div class="flex-1 space-y-6">
+      <div class="flex-1 min-w-0 space-y-6">
         <div>
           <h1 class="text-2xl font-bold tracking-wide">风扇控制</h1>
           <p class="text-[13px] text-gray-500 mt-1">
@@ -97,7 +95,7 @@ onMounted(refresh)
       </div>
 
       <!-- ==================== 右侧：实时监控 ==================== -->
-      <div class="w-full lg:w-[360px] shrink-0 space-y-6 lg:pt-[115px]">
+      <div class="w-full xl:w-[360px] shrink-0 space-y-6 xl:pt-[115px]">
         <FanSpeed />
 
         <div class="panel-card space-y-2.5 select-none">

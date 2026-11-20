@@ -78,9 +78,13 @@ sudo ./install.sh
 | GPU 曲线超频 | ❌ | Linux 无 NVAPI VF 曲线接口 |
 | CPU TDP / EDC / 温度墙 / CO | ✅ | 经 `ryzen_smu` 内核模块写 SMU 邮箱，AM5 命令表已验证（status=1）；客观验证见 `probe/tdp.mjs`（RAPL 实测整包功耗） |
 | CPU 整包功耗显示 | ✅ | RAPL `package-0`（`intel_rapl_msr` 在 AMD 上可用），`energy_uj` 差分算瓦数，填充 RyzenSMU 页的 Ppt（原先恒为 0） |
-| 开机自动应用 | ✅ | daemon 启动时把 config 里勾选的性能参数重放（CPU 档位/最大频率/睿频、SMU 逐项、全核或分核 CO、自动风扇曲线）；日志会打印成功/失败/跳过清单 |
-| 屏幕 OSD 覆盖层 | ❌ | Wayland 不允许应用自定位窗口 |
+| 开机自动应用 | ✅ | daemon 启动时把 config 里勾选的性能参数重放（CPU 档位/最大频率/睿频、SMU 逐项、全核或分核 CO）；日志会打印成功/失败/跳过清单 |
+| 屏幕 OSD 覆盖层 | ✅ | 外壳的独立置顶透明窗（XWayland），实测可盖在普通窗口之上、点击穿透、不进任务栏；从屏幕边缘水平滑入、原路滑出。只做系统自己不提示的四类：**性能模式 / 风扇 / 键盘背光 / 触摸板**。触发靠 500 ms 轮询（Wayland 无全局按键钩子），面板内操作后立即刷新；音量仍由 GNOME 原生提示，不重复显示 |
 | 托盘 | ⚠️ | GNOME 需 AppIndicator 扩展 |
+
+OSD 实机效果（右下角，从屏幕边缘滑入后停留 1.8 s 滑出）：
+
+![OSD](docs/osd-bottom-right.png)
 
 ## 目录
 

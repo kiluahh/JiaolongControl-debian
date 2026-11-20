@@ -218,8 +218,16 @@ async function setTouchpadLock(args, {runGsettings: run, emit}) {
  * }} deps
  * @returns {null | {Success: boolean, Message: string, Data?: unknown}}
  */
+async function showTest(args, deps) {
+  const [kind, value] = args ?? []
+  const shown = deps.osd?.showTest?.(String(kind), value)
+  if (!shown) return {Success: false, Message: '该 OSD 类型尚未实现（本机只做性能模式/风扇/键盘背光/触摸板）'}
+  return {Success: true, Message: '已显示 OSD 预览'}
+}
+
 export async function handleShellCall(group, method, args, deps = {}) {
   if (group === 'SystemInfo' && method === 'OpenUrl') return openUrl(args, deps)
+  if (group === 'Osd' && method === 'ShowTest') return showTest(args, deps)
   if (group === 'Osd' && method === 'GetLockStates') return getLockStates(deps)
   if (group === 'Osd' && method === 'SetTouchpadLock') return setTouchpadLock(args, deps)
   if (group === 'Osd' && method === 'GetVolume') return serialVolume(() => getVolume(deps))

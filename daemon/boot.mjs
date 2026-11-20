@@ -146,11 +146,6 @@ export function planBootActions(cfg) {
     actions.push({group: 'RyzenSmu', method: `Set${key}`, args: [v], label: `SMU ${key}=${v}`})
   }
 
-  // ⑤ 自动风扇曲线控制（放最后：先设功耗/温度墙，再接管转速）
-  if (app.BootAdvancedFanControlSystem) {
-    actions.push({group: 'AutoFan', method: 'Start', args: [], label: '启动自动风扇曲线控制'})
-  }
-
   return actions
 }
 

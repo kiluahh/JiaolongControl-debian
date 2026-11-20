@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {callDaemon, pingDaemon} from './bridge.mjs'
 import {handleShellCall, runGsettings, runWpctl} from './shellCalls.mjs'
+import {createOsd} from './osd.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -14,6 +15,7 @@ const ICON = path.join(ROOT, 'client', 'src', 'assets', 'icon', 'icon.png')
 
 let win = null
 let tray = null
+let osd = null
 
 function createWindow() {
   win = new BrowserWindow({
@@ -108,9 +110,17 @@ ipcMain.handle('jlc:call', async (_e, {group, method, args}) => {
     runGsettings,
     runWpctl,
     emit: emitToRenderer,
+    osd: {
+      showTest: (kind, value) => osd?.showTest(kind, value) ?? false,
+    },
   })
-  if (local) return local
+  if (local) {
+    // 面板自己改了状态（风扇/背光/触摸板/性能模式）：立刻补一次采样，OSD 秒出
+    osd?.syncNow()
+    return local
+  }
   const res = await callDaemon(group, method, args)
+  osd?.syncNow()
   return res
 })
 
@@ -135,6 +145,9 @@ ipcMain.on('jlc:window', (e, message) => {
 app.whenReady().then(async () => {
   createWindow()
   if (!SMOKE) buildTray()
+
+  osd = createOsd({callDaemon, runGsettings, log: (m) => console.log(m)})
+  osd.start().catch((e) => console.error('OSD 启动失败:', e?.message ?? e))
 
   if (SMOKE) {
     // 自检：加载前端 → 走 preload shim → IPC → daemon，验证整条链路
@@ -173,6 +186,12 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  try {
+    osd?.destroy()
+  } catch {}
 })
 
 app.on('window-all-closed', () => {

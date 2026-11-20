@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, ref} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import SettingToggle from '@/components/common/SettingToggle.vue'
 import EditableValue from '@/components/common/EditableValue.vue'
@@ -12,11 +12,13 @@ const osdData = computed(() => configStore.config?.Osd)
 
 // ===== 显示效果 =====
 const positionOptions: Array<{ value: OsdPosition; label: string }> = [
-  { value: 'TopCenter', label: '顶部居中' },
-  { value: 'BottomCenter', label: '底部居中' },
+  { value: 'TopLeft', label: '左上' },
+  { value: 'TopRight', label: '右上' },
+  { value: 'BottomLeft', label: '左下' },
+  { value: 'BottomRight', label: '右下' },
   { value: 'Custom', label: '自定义' },
 ]
-const currentPosition = computed(() => osdData.value?.Position ?? 'TopCenter')
+const currentPosition = computed(() => osdData.value?.Position ?? 'BottomRight')
 
 function selectPosition(value: OsdPosition) {
   if (!osdData.value || currentPosition.value === value) return
@@ -47,13 +49,13 @@ const sliderRows: OsdSliderRow[] = [
   { key: 'Scale', label: '界面缩放', min: 100, max: 200, step: 5, unit: '%', sliderClass: 'slider-orange' },
   {
     key: 'PollIntervalMs',
-    label: 'EC 状态轮询间隔',
+    label: '状态轮询间隔',
     min: 500,
     max: 5000,
     step: 100,
     unit: 'ms',
     sliderClass: 'slider-red',
-    note: '原生 Fn 热键（性能模式 / 背光 / Fn 锁 / 触摸板锁）优先经 HID_EVENT20\n事件通道即时检测；此间隔仅在事件通道不可用时作为轮询兜底',
+    note: 'Wayland 不允许全局按键钩子，状态变化只能靠轮询 EC 寄存器与 GNOME 设置检测；\n这是两次采样的间隔。调小反应更快，代价是更频繁读 EC。',
   },
 ]
 
@@ -65,7 +67,7 @@ let previewDragging = false
 
 const pillStyle = computed(() => {
   const x = ((osdData.value?.CustomX ?? 50) / 100).toFixed(4)
-  const y = ((osdData.value?.CustomY ?? 8) / 100).toFixed(4)
+  const y = ((osdData.value?.CustomY ?? 92) / 100).toFixed(4)
   return {
     left: `calc((100% - ${PILL_W}px) * ${x})`,
     top: `calc((100% - ${PILL_H}px) * ${y})`,
@@ -103,70 +105,8 @@ function onPillPointerUp() {
   previewDragging = false
 }
 
-// ===== 效果预览: 音量实时控制 + 各状态 OSD 预览 =====
-const volume = ref(0)
-const muted = ref(false)
-
-async function refreshVolume() {
-  try {
-    const res = await Osd.GetVolume()
-    if (res.Success && res.Data) {
-      volume.value = res.Data.Volume
-      muted.value = res.Data.Muted
-    }
-  } catch (e) {
-    console.warn('读取系统音量失败', e)
-  }
-}
-
-// 拖动时 Arco 每次移动都会触发 change。这里做 120ms 节流：拖动过程中音量跟着变
-// （最多每秒 10 次 wpctl），又不会"每像素一次"；成功后不回写滑条值，避免
-// 异步回读把滑条拽回旧值——那正是"先回弹、再慢慢滑到终点"的原因。
-const VOLUME_MIN_INTERVAL_MS = 120
-let volumeTimer: ReturnType<typeof setTimeout> | null = null
-let pendingVolume = 0
-let lastAppliedAt = 0
-
-function onVolumeChange(val: number | [number, number]) {
-  if (typeof val !== 'number') return
-  pendingVolume = val
-  if (volumeTimer) clearTimeout(volumeTimer)
-  const wait = Math.max(0, VOLUME_MIN_INTERVAL_MS - (Date.now() - lastAppliedAt))
-  volumeTimer = setTimeout(() => {
-    volumeTimer = null
-    lastAppliedAt = Date.now()
-    void applyVolume(pendingVolume)
-  }, wait)
-}
-
-async function applyVolume(val: number) {
-  try {
-    const res = await Osd.SetVolume(val)
-    // 成功时不回写 volume：滑条已经停在用户放下的位置，回写只会和手抢位置
-    if (!res.Success) {
-      Message.error(res.Message)
-      await refreshVolume()
-    }
-  } catch {
-    Message.error('设置音量失败')
-  }
-}
-
-async function onToggleMute() {
-  try {
-    const res = await Osd.SetMute(!muted.value)
-    if (res.Success) {
-      muted.value = !muted.value
-      await refreshVolume()
-    } else {
-      Message.error(res.Message)
-    }
-  } catch {
-    Message.error('设置静音失败')
-  }
-}
-
-async function preview(kind: string, value = 0) {
+// ===== 效果预览: 四类 OSD 各弹一次真窗口 =====
+async function preview(kind: string, value: number | boolean) {
   try {
     const res = await Osd.ShowTest(kind, value)
     if (!res.Success) Message.error(res.Message)
@@ -175,22 +115,12 @@ async function preview(kind: string, value = 0) {
   }
 }
 
-const previewItems = [
-  { kind: 'volume', label: '音量指示' },
-  { kind: 'lock', label: '锁定键' },
-  { kind: 'keyboard', label: '键盘背光' },
-  { kind: 'perf', label: '性能模式' },
-  { kind: 'media', label: '媒体播放' },
+const previewItems: Array<{ kind: string; label: string; value: number | boolean }> = [
+  { kind: 'perf', label: '性能模式', value: 1 },
+  { kind: 'fan', label: '风扇', value: true },
+  { kind: 'keyboard', label: '键盘背光', value: 3 },
+  { kind: 'touchpad', label: '触摸板', value: true },
 ]
-
-onMounted(() => {
-  refreshVolume()
-})
-
-onUnmounted(() => {
-  if (volumeTimer) clearTimeout(volumeTimer)
-  volumeTimer = null
-})
 </script>
 
 <template>
@@ -200,71 +130,44 @@ onUnmounted(() => {
       <div>
         <h1 class="text-2xl font-bold tracking-wide">OSD 屏幕显示</h1>
         <p class="text-[13px] text-gray-500 mt-1">
-          OSD悬浮指示器：按键时在屏幕指定位置即时显示状态，完成后悄然隐去
+          OSD 悬浮指示器：状态变化时在屏幕指定位置弹出置顶胶囊，随后自动隐去（音量由系统自带提示，这里不重复显示）
         </p>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-6 pt-6">
+      <div class="flex flex-col xl:flex-row gap-6 pt-6">
         <!-- ==================== 左列: 开关与显示项目 ==================== -->
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 min-w-0 space-y-4">
           <SettingToggle
             config-path="Osd.Enabled"
-            description="启用后，按下音量键、大小写锁定等按键时，屏幕上会弹出置顶的胶囊指示器（无需重启，即时生效）"
+            description="启用后，性能模式、风扇、键盘背光、触摸板状态变化时，屏幕上会弹出置顶的胶囊指示器（无需重启，即时生效）"
             title="启用 OSD 屏幕显示"
           />
           <SettingToggle
-            config-path="Osd.ShowVolume"
-            description="按下音量增大 / 减小 / 静音键时，显示系统音量条与百分比；OSD 停留期间可直接拖动进度条调整音量，或点击小喇叭按钮切换静音"
-            title="音量指示"
+            config-path="Osd.ShowPerformanceMode"
+            description="切换性能模式（面板内操作，或 Fn 快捷键由 EC 直接改寄存器）时显示当前模式名称；靠状态轮询检测，变化后约一个轮询间隔内弹出"
+            title="性能模式切换"
           />
           <SettingToggle
-            config-path="Osd.SuppressNativeVolumeOsd"
-            description="开启后，按下音量增大 / 减小 / 静音键不再弹出 Windows 原生音量面板，改由本程序接管按键调整系统音量并显示自绘 OSD（需「启用 OSD 屏幕显示」开启；关闭本项立即恢复系统原生行为）"
-            title="屏蔽系统原生音量弹窗"
-          />
-          <SettingToggle
-            description="按下大写锁定 / 数字锁定 / 滚动锁定键时，显示对应的开关状态"
-            title="锁定键状态"
-            config-path="Osd.ShowLockKeys"
+            config-path="Osd.ShowFan"
+            description="风扇在「自动 / 全速」之间切换时显示当前状态（对应 EC 0x0751 bit6）"
+            title="风扇模式"
           />
           <SettingToggle
             config-path="Osd.ShowKeyboardBacklight"
-            description="通过本软件调整键盘背光亮度时，显示当前档位（Fn 组合键由 EC 直接处理）；OSD 停留期间可直接点击分段选择 0~3 档"
+            description="通过本软件调整键盘背光亮度时显示当前档位（0~4 档，对应 EC 0x078c）"
             title="键盘背光档位"
           />
           <SettingToggle
-            description="切换性能模式时（软件内或原生 Fn 热键）显示当前模式名称（原生热键经 EC 状态轮询检测）"
-            title="性能模式切换"
-            config-path="Osd.ShowPerformanceMode"
-          />
-          <SettingToggle
-            config-path="Osd.ShowPerfTelemetry"
-            description="开启后，模式切换 OSD 的标题附带模式名称，并在读取完成后补充显示当前 CPU / GPU 温度与双风扇转速（经 EC 与 NVIDIA API 后台读取，约需零点几秒，读取失败时仅显示模式名）"
-            title="模式 OSD 附带温度/转速"
-          />
-          <SettingToggle
-            config-path="Osd.ShowFnLock"
-            description="原生 Fn 组合键切换功能键锁定时显示状态（EC 状态轮询检测，变化后约一个轮询间隔内弹出）"
-            title="功能键锁定 (Fn Lock)"
-          />
-          <SettingToggle
-            title="触摸板锁定"
             config-path="Osd.ShowTouchpad"
-            description="原生 Fn 组合键切换触摸板锁定时显示状态（EC 状态轮询检测，变化后约一个轮询间隔内弹出）"
-          />
-          <SettingToggle
-            config-path="Osd.ShowMedia"
-            description="系统有程序开始播放音乐或切歌时，显示曲名与歌手（经 Windows 系统媒体会话检测，支持网易云、Spotify、浏览器等）；胶囊右侧提供上一曲 / 播放暂停 / 下一曲控制按钮"
-            title="媒体播放提示"
+            description="触摸板启用 / 禁用状态变化时显示（读 GNOME 的 touchpad send-events 设置）"
+            title="触摸板锁定"
           />
         </div>
 
         <!-- ==================== 右列: 显示效果与预览 ==================== -->
-        <div class="w-full lg:w-[380px] shrink-0 space-y-6">
+        <div class="w-full xl:w-[380px] shrink-0 space-y-6">
           <!-- 显示效果 -->
-          <div
-            class="panel-card space-y-5"
-          >
+          <div class="panel-card space-y-5">
             <h3
               class="text-xs font-black text-purple-400 uppercase tracking-widest border-l-4 border-purple-600 pl-2.5"
             >
@@ -273,9 +176,7 @@ onUnmounted(() => {
 
             <div>
               <div class="text-[11px] text-gray-400 mb-2">显示位置</div>
-              <div
-                class="flex items-center gap-1 p-1 rounded-xl bg-ink/[0.04] border border-ink/[0.06]"
-              >
+              <div class="flex items-center gap-1 p-1 rounded-xl bg-ink/[0.04] border border-ink/[0.06]">
                 <button
                   v-for="opt in positionOptions"
                   :key="opt.value"
@@ -305,9 +206,7 @@ onUnmounted(() => {
                     @pointerup="onPillPointerUp"
                   />
                 </div>
-                <div
-                  class="absolute inset-x-0 bottom-0 h-[10px] bg-ink/[0.06] border-t border-ink/[0.06]"
-                />
+                <div class="absolute inset-x-0 bottom-0 h-[10px] bg-ink/[0.06] border-t border-ink/[0.06]" />
               </div>
               <p class="text-[10px] text-gray-600 leading-relaxed mt-1.5">
                 拖动胶囊到任意位置即保存为自定义位置（真实 OSD 出现在主屏的对应处）；
@@ -344,71 +243,48 @@ onUnmounted(() => {
           </div>
 
           <!-- 效果预览 -->
-          <div
-            class="panel-card space-y-4"
-          >
+          <div class="panel-card space-y-4">
             <h3
               class="text-xs font-black text-blue-400 uppercase tracking-widest border-l-4 border-blue-500 pl-2.5"
             >
               效果预览
             </h3>
-
-            <div class="space-y-1.5">
-              <div class="flex justify-between items-center text-[11px]">
-                <span class="text-gray-400">系统音量（拖动即弹出 OSD）</span>
-                <span class="text-ink font-mono">{{ volume }}%{{ muted ? ' · 静音' : '' }}</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <a-slider
-                  v-model="volume"
-                  :max="100"
-                  :min="0"
-                  class="flex-1 slider-blue"
-                  @change="onVolumeChange"
-                />
-                <a-button
-                  class="!bg-blue-600/10 !text-blue-400 !border-blue-500/25 hover:!bg-blue-600 hover:!text-white rounded-md px-3 font-semibold transition"
-                  size="small"
-                  @click="onToggleMute"
-                >
-                  {{ muted ? '取消静音' : '静音' }}
-                </a-button>
-              </div>
-            </div>
-
             <div class="grid grid-cols-2 gap-2">
               <a-button
                 v-for="item in previewItems"
                 :key="item.kind"
                 class="!rounded-lg font-semibold !bg-ink/[0.04] !text-ink !border-ink/[0.08] hover:!bg-purple-600/20 hover:!text-purple-300 transition"
-                @click="preview(item.kind)"
+                @click="preview(item.kind, item.value)"
               >
                 预览{{ item.label }}
               </a-button>
             </div>
+            <p class="text-[10px] text-gray-600 leading-relaxed">
+              预览不受「启用 OSD」开关限制，点一下就在屏幕真实位置弹一次。
+            </p>
           </div>
 
           <!-- 说明 -->
-          <div
-            class="panel-card"
-          >
+          <div class="panel-card">
             <h2 class="text-[13px] font-semibold text-gray-300 mb-3">名词解释</h2>
             <div class="text-[11px] text-gray-500 leading-relaxed space-y-2">
               <p>
-                <strong>可交互胶囊</strong>:
-                音量 / 键盘背光 / 媒体 OSD 停留期间可直接操作（拖动调音量、点分段选背光档位、按钮控制播放），操作不抢走当前应用焦点，锁定键等其他 OSD 保持点击穿透。
+                <strong>触发方式</strong>:
+                Wayland 不允许程序监听全局按键，所以这里轮询 EC 寄存器与 GNOME 设置来判断状态变化；
+                从面板里操作时外壳会立刻补一次采样，反馈是即时的。
               </p>
               <p>
-                <strong>键盘事件触发</strong>:
-                音量与锁定键经全局键盘钩子监听，按键不会被拦截，系统行为不受影响。
+                <strong>覆盖范围</strong>:
+                独立置顶透明窗，显示在普通窗口之上，点击穿透、不抢焦点、不进任务栏与 Alt-Tab。
+              </p>
+              <p>
+                <strong>音量</strong>:
+                GNOME 自带音量条且没有关闭 API，本程序不再重复实现，避免一次按键弹两条；
+                音量仍可在 OSD 页之外按系统方式调节。
               </p>
               <p>
                 <strong>自动缩放</strong>:
-                OSD 按显示器 DPI 物理像素定位与渲染，系统缩放调整后位置与清晰度自动适配。
-              </p>
-              <p>
-                <strong>主题自适应</strong>:
-                胶囊面板自动跟随应用的深色 / 浅色主题，强调色与工具箱配色一致。
+                面板内容按窗口高度等比渲染，「界面缩放」调大后字号与位置一起放大，高 DPI 下自动适配。
               </p>
             </div>
           </div>

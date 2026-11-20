@@ -2,8 +2,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import {migrateFanConfig} from './fan.mjs'
-
 const FILE = process.env.JLC_CONFIG || '/etc/jlc/config.json'
 
 const cpuProfile = (longPower, shortPower, tempWall, maxFreq, turbo) => ({
@@ -18,7 +16,6 @@ export const DEFAULTS = {
   Version: '1.0.0',
   App: {
     BootMinimized: false,
-    BootAdvancedFanControlSystem: false,
     BootAdvancedCPUSystem: false,
     BootAdvancedGPUSystem: false,
     BootSetRyzenSmuCurveOptimizerAll: false,
@@ -37,21 +34,6 @@ export const DEFAULTS = {
     Custom: cpuProfile(55, 75, 95, 4800, true),
   },
   Gpu: {GpuClock: 0, MemoryClock: 0, CoreClockOffsetMhz: 0, MemoryClockOffsetMhz: 0},
-  Fan: {
-    // 转速口径统一为 RPM（与前端 Fan 页滑条、风扇曲线编辑器一致）
-    FanCurveMerge: true,
-    ManualFanSpeed: 3000,
-    CpuFanCurve: [
-      {temp: 60, speed: 1500},
-      {temp: 80, speed: 3000},
-      {temp: 100, speed: 5800},
-    ],
-    GpuFanCurve: [
-      {temp: 60, speed: 1500},
-      {temp: 75, speed: 3000},
-      {temp: 87, speed: 5800},
-    ],
-  },
   Smu: {
     StapmLimit: 0,
     StapmTime: 0,
@@ -74,23 +56,19 @@ export const DEFAULTS = {
   },
   Osd: {
     Enabled: false,
-    ShowVolume: true,
-    ShowLockKeys: true,
-    ShowKeyboardBacklight: true,
+    // 只做系统自己不提示的四类：性能模式 / 风扇 / 键盘背光 / 触摸板
     ShowPerformanceMode: true,
-    ShowPerfTelemetry: false,
-    ShowFnLock: true,
+    ShowFan: true,
+    ShowKeyboardBacklight: true,
     ShowTouchpad: true,
-    ShowMedia: true,
-    SuppressNativeVolumeOsd: false,
     AnimationMs: 180,
     DurationMs: 1600,
-    PollIntervalMs: 200,
-    Position: 'BottomCenter',
-    CustomX: 0,
-    CustomY: 0,
-    Opacity: 0.92,
-    Scale: 1,
+    PollIntervalMs: 500,
+    Position: 'BottomRight',
+    CustomX: 50,
+    CustomY: 92,
+    Opacity: 92,
+    Scale: 100,
   },
 }
 
@@ -107,6 +85,18 @@ let cached = null
 
 const PROFILES = ['Default', 'Performance', 'Saving', 'Custom']
 
+/**
+ * 清掉已下线功能的遗留字段：风扇曲线 / 自动风扇 / OSD 里用不到的开关。
+ * 不清理的话旧 config.json 会被原样写回去，看着像还支持。
+ */
+function pruneLegacy(cfg) {
+  delete cfg.Fan
+  if (cfg.App) delete cfg.App.BootAdvancedFanControlSystem
+  if (cfg.Osd) {
+    for (const k of Object.keys(cfg.Osd)) if (!(k in DEFAULTS.Osd)) delete cfg.Osd[k]
+  }
+}
+
 export function loadConfig() {
   if (cached) return cached
   try {
@@ -115,10 +105,7 @@ export function loadConfig() {
   } catch {
     cached = structuredClone(DEFAULTS)
   }
-  // 迁移：风扇曲线/手动转速的旧口径是百分比 0..100，现在统一为 RPM。
-  // 不迁移的话 95℃ 只会算出 100 RPM ≈ 3/200 占空比，风扇基本不转。
-  const fan = migrateFanConfig(cached.Fan)
-  if (fan.migrated) cached.Fan = fan.fan
+  pruneLegacy(cached)
 
   // 迁移：早期版本把 CpuMaxFrequency 留成 0，等于"每次应用都失败"，这里补成出厂值
   for (const name of PROFILES) {
@@ -131,9 +118,8 @@ export function loadConfig() {
 }
 
 export function saveConfig(patch) {
-  let next = deepMerge(loadConfig(), patch ?? {})
-  const fan = migrateFanConfig(next.Fan)
-  if (fan.migrated) next = {...next, Fan: fan.fan}
+  const next = deepMerge(loadConfig(), patch ?? {})
+  pruneLegacy(next)
   fs.mkdirSync(path.dirname(FILE), {recursive: true})
   fs.writeFileSync(FILE, JSON.stringify(next, null, 2) + '\n')
   cached = next

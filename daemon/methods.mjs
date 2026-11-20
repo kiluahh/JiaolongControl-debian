@@ -3,14 +3,13 @@
  * 每个处理函数返回 {Success, Message, Data}。
  */
 import fs from 'node:fs'
-import {Ec, REG, MODE_BIT, CUME_BIT, FAN_DUTY_MAX, applyPerformanceMode} from './ec.mjs'
+import {Ec, REG, MODE_BIT, CUME_BIT, applyPerformanceMode} from './ec.mjs'
 import * as sys from './hw/sysfs.mjs'
 import {nvidia, clockRange, lockClock, resetClock} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
 import {ledStates, readLedEntries} from './hw/locks.mjs'
 import * as smu from './hw/smu.mjs'
 import {createPowerSampler} from './hw/rapl.mjs'
-import {FAN_MAX_RPM, curveRpm, rpmToDuty} from './hw/fan.mjs'
 import {
   LEVEL_MAX,
   decodeBrightness,
@@ -38,57 +37,6 @@ function ecGuard(fn, label) {
   } catch (e) {
     return fail(`${label}: ${e.message}`)
   }
-}
-
-// ── 自动风扇控制 ────────────────────────────────────────────────────────────
-const autoFan = {
-  timer: null,
-  target: 0,
-  running: false,
-  start() {
-    if (this.timer) return
-    this.running = true
-    this.timer = setInterval(() => {
-      try {
-        this.tick()
-      } catch {
-        /* 单次失败不终止控制环 */
-      }
-    }, 1000)
-  },
-  stop() {
-    this.running = false
-    if (this.timer) clearInterval(this.timer)
-    this.timer = null
-    ecGuard(() => ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, false), '停止自动风扇')
-  },
-  tick() {
-    if (!ec.available) return
-    const cfg = loadConfig()
-    // 曲线与手动转速都是 RPM（前端 Fan 页 0..8000、曲线编辑器 1500..6800），
-    // 由 curveRpm 统一插值，再由 rpmToDuty 折算成 0..200 的占空比。
-    const rpm = curveRpm(cfg.Fan?.CpuFanCurve, ec.tryRead(REG.CPU_TEMP, sys.cpuTempC() ?? 0), Number(cfg.Fan?.ManualFanSpeed ?? 0))
-    this.target = rpm
-    const duty = rpmToDuty(rpm)
-    ec.writeByte(REG.DUTY_CPU, duty)
-    if (cfg.Fan?.FanCurveMerge) ec.writeByte(REG.DUTY_GPU, duty)
-    ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, true)
-  },
-}
-
-function interpolate(points, temp) {
-  const pts = [...points].sort((a, b) => a.temp - b.temp)
-  if (temp <= pts[0].temp) return pts[0].speed
-  if (temp >= pts[pts.length - 1].temp) return pts[pts.length - 1].speed
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1]
-    const b = pts[i]
-    if (temp <= b.temp) {
-      const t = (temp - a.temp) / (b.temp - a.temp || 1)
-      return a.speed + t * (b.speed - a.speed)
-    }
-  }
-  return pts[pts.length - 1].speed
 }
 
 // ── 方法表 ──────────────────────────────────────────────────────────────────
@@ -260,21 +208,6 @@ export const methods = {
       }
     },
     IsEnabled: () => ok(fs.existsSync('/etc/xdg/autostart/jiaolong.desktop')),
-  },
-
-  AutoFan: {
-    // 本机没有可用的「按转速」写入通路（见 Fan.SetFanSpeed 的说明），
-    // 控制环跑起来只会把 full-fan 位置上 → 风扇恒满速，所以直接拒绝启动。
-    Start: () => fail('本机 EC 不支持按转速调速，自动风扇曲线无法落地；请用「全速风扇」开关'),
-    StartLegacy: () => {
-      autoFan.start()
-      return ok(undefined, '自动风扇已启动（本机无效）')
-    },
-    Stop: () => {
-      autoFan.stop()
-      return ok(undefined, '自动风扇已停止')
-    },
-    IsRunning: () => ok(autoFan.running),
   },
 
   KeyboardGradient: {

@@ -86,9 +86,9 @@ onUnmounted(() => {
         <p class="text-[13px] text-gray-500 mt-1">设备快捷控制与常用开关</p>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-6 pt-6">
+      <div class="flex flex-col xl:flex-row gap-6 pt-6">
         <!-- ==================== 左列: 锁定控制与设备开关 ==================== -->
-        <div class="flex-1 space-y-6">
+        <div class="flex-1 min-w-0 space-y-6">
           <div
             class="panel-card space-y-4"
           >
@@ -123,11 +123,6 @@ onUnmounted(() => {
           <LogoLight />
           <GPUDirectConnection />
           <SettingToggle
-            config-path="Fan.FanCurveMerge"
-            description="启用后，软件将在【风扇曲线】页面中将所有风扇的曲线合并为一条曲线，方便用户统一调整风扇转速"
-            title="风扇曲线合并"
-          />
-          <SettingToggle
             config-path="App.CpuCurveOptimizerPerCore"
             description="启用后，【CPU】页面的核心电压偏移将由全核滑条替换为分核心降压：应用设置时逐核心写入 Curve Optimizer 数值（各核心数值在【Ryzen SMU】页面的分核矩阵中设置）"
             title="CPU 分核心降压"
@@ -135,7 +130,7 @@ onUnmounted(() => {
         </div>
 
         <!-- ==================== 右列: 说明 ==================== -->
-        <div class="w-full lg:w-[380px] shrink-0 space-y-6">
+        <div class="w-full xl:w-[380px] shrink-0 space-y-6">
           <div
             class="panel-card"
           >

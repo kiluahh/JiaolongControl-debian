@@ -20,11 +20,6 @@ interface ToggleCard {
 
 const toggleCards: ToggleCard[] = [
   {
-    title: '自启动高级风扇控制系统',
-    description: '启用后，软件将在后台实时监控硬件温度，并依据【风扇曲线】页面中用户自定义的策略来动态调整风扇转速',
-    configPath: 'App.BootAdvancedFanControlSystem',
-  },
-  {
     title: 'CPU 参数自动应用',
     description: '在软件启动时，自动载入并应用【CPU】设置页面中保存的功耗、频率、温度墙等高级参数',
     configPath: 'App.BootAdvancedCPUSystem',

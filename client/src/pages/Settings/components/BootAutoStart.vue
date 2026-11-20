@@ -66,7 +66,7 @@ async function onMinimizedChange(next: string | number | boolean) {
   <div class="contents space-y-3">
     <setting-card-component
       title="开机自启"
-      description="允许 JiaoLongControl 随 Windows 操作系统启动而自动运行，确保各类硬件优化策略与自定义风扇曲线实时生效。"
+      description="允许 JiaoLongControl 随 Windows 操作系统启动而自动运行，确保性能模式、CPU 参数与键盘背光等设置保持生效。"
     >
       <template #extra>
         <a-switch

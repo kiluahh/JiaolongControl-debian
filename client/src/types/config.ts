@@ -1,16 +1,10 @@
 // 与 C# JiaoLongConfig.cs 保持同步
 // 新增字段：在 C# 类中加属性，在此 interface 中加对应字段
 
-export interface FanPoint {
-  temp: number
-  speed: number
-}
-
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 export interface AppSectionType {
   BootMinimized: boolean
-  BootAdvancedFanControlSystem: boolean
   BootAdvancedCPUSystem: boolean
   BootAdvancedGPUSystem: boolean
   BootSetRyzenSmuCurveOptimizerAll: boolean
@@ -47,13 +41,6 @@ export interface GpuSectionType {
   MemoryClockOffsetMhz: number
 }
 
-export interface FanSectionType {
-  FanCurveMerge: boolean
-  ManualFanSpeed: number
-  CpuFanCurve: FanPoint[]
-  GpuFanCurve: FanPoint[]
-}
-
 export interface SmuSectionType {
   StapmLimit: number
   StapmTime: number
@@ -75,19 +62,14 @@ export interface SmuSectionType {
   BootApplyItems: string[]
 }
 
-export type OsdPosition = 'TopCenter' | 'BottomCenter' | 'Custom'
+export type OsdPosition = 'TopLeft' | 'TopRight' | 'BottomLeft' | 'BottomRight' | 'Custom'
 
 export interface OsdSectionType {
   Enabled: boolean
-  ShowVolume: boolean
-  ShowLockKeys: boolean
-  ShowKeyboardBacklight: boolean
   ShowPerformanceMode: boolean
-  ShowPerfTelemetry: boolean
-  ShowFnLock: boolean
+  ShowFan: boolean
+  ShowKeyboardBacklight: boolean
   ShowTouchpad: boolean
-  ShowMedia: boolean
-  SuppressNativeVolumeOsd: boolean
   AnimationMs: number
   DurationMs: number
   PollIntervalMs: number
@@ -103,7 +85,6 @@ export interface JiaoLongConfigType {
   App: AppSectionType
   Cpu: CpuSectionType
   Gpu: GpuSectionType
-  Fan: FanSectionType
   Smu: SmuSectionType
   Osd: OsdSectionType
 }

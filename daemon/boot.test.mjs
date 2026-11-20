@@ -8,7 +8,6 @@ function baseConfig(patch = {}) {
   return {
     App: {
       BootMinimized: false,
-      BootAdvancedFanControlSystem: false,
       BootAdvancedCPUSystem: false,
       BootAdvancedGPUSystem: false,
       BootSetRyzenSmuCurveOptimizerAll: false,
@@ -134,20 +133,6 @@ test('planBootActions：GPU 自动应用明确标记跳过', () => {
   assert.match(skips(actions).join(), /GPU/)
 })
 
-test('planBootActions：自动风扇控制排在最后', () => {
-  const actions = only(
-    planBootActions(
-      baseConfig({
-        App: {BootAdvancedCPUSystem: true, BootAdvancedFanControlSystem: true},
-        Smu: {StapmLimit: 65, BootApplyItems: ['StapmLimit']},
-      }),
-    ),
-  )
-  assert.deepEqual(
-    actions.map((a) => a.method),
-    ['SetCpuLongPower', 'SetCpuShortPower', 'SetCPUTempWall', 'SetCPUMaxFrequency', 'EnableTurbo', 'SetStapmLimit', 'Start'],
-  )
-})
 
 test('runBootActions：成功/失败/跳过分别汇总，失败不中断', async () => {
   const calls = []
