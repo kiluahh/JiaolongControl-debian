@@ -26,6 +26,7 @@ const arg = (n, d) => {
 }
 const MODE = arg('mode', 'perf')
 const KEEP = argv.includes('--keep')
+const CTAF = argv.includes('--ctaf') // 先 INOU.CTAF(1) 打开系统级控制，再 PMSF
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(ROOT, 'probe', 'mode-set.json')
@@ -76,6 +77,11 @@ function callPmsf() {
   return fs.readFileSync(CALL, 'utf8').replace(/\0/g, '').trim()
 }
 
+function callCtaf(on) {
+  fs.writeFileSync(CALL, `\\_SB.INOU.CTAF ${on ? '0x1' : '0x0'}`)
+  return fs.readFileSync(CALL, 'utf8').replace(/\0/g, '').trim()
+}
+
 function snap(tag) {
   const s = {
     tag,
@@ -103,6 +109,7 @@ function restore() {
   try {
     ecWrite(REG.MODE, saved.mode)
     ecWrite(REG.CUME, saved.cume)
+    if (CTAF) callCtaf(false)
     callPmsf()
     rec(`已还原 mode=0x${saved.mode.toString(16)} cume=0x${saved.cume.toString(16)}`)
   } catch (e) {
@@ -146,6 +153,10 @@ try {
     rec(`  +${d}ms 回读 mode=0x${m.toString(16)} cume=0x${c.toString(16)}${m === newMode && c === newCume ? '' : ' ⚠️ 与写入不符'}`)
   }
 
+  if (CTAF) {
+    const out = callCtaf(true)
+    rec(`调用 CTAF(1) → ${JSON.stringify(out.slice(0, 60))}`)
+  }
   const pmsfOut = callPmsf()
   rec(`调用 PMSF → ${JSON.stringify(pmsfOut.slice(0, 60))}`)
 
