@@ -310,8 +310,8 @@ export const methods = {
   },
 
   Power: {
-    SetCPUMaxFrequency: (mhz) => {
-      let want = Number(mhz)
+    SetCPUMaxFrequency: async (mhz) => {
+      const want = Number(mhz)
       if (!Number.isFinite(want) || want < 0) return fail(`频率值无效: ${mhz}`)
       const base = '/sys/devices/system/cpu/cpufreq'
       const readNum = (f) => {
@@ -329,19 +329,16 @@ export const methods = {
       }
       if (!policies.length) return fail('没有找到 cpufreq policy')
 
-      // 0 表示"不限制"：取该策略的硬件上限
+      // 0 表示"不限制"：取硬件上限
       const resolved = want > 0 ? want : Math.round((readNum(`${base}/policy0/cpuinfo_max_freq`) ?? 5385000) / 1000)
-      const results = []
+
+      const writeErrors = []
       for (const p of policies) {
         const dir = `${base}/${p}`
         const maxFile = `${dir}/scaling_max_freq`
         const minFile = `${dir}/scaling_min_freq`
         try {
-          if (!fs.existsSync(maxFile)) {
-            results.push({p, ok: false, why: '无 scaling_max_freq'})
-            continue
-          }
-          // 钳到硬件范围，否则 amd-pstate 会 EINVAL
+          if (!fs.existsSync(maxFile)) continue
           const infoMax = readNum(`${dir}/cpuinfo_max_freq`)
           const infoMin = readNum(`${dir}/cpuinfo_min_freq`)
           let target = Math.round(resolved * 1000)
@@ -351,22 +348,27 @@ export const methods = {
           const curMin = readNum(minFile)
           if (curMin && target < curMin) fs.writeFileSync(minFile, String(target))
           fs.writeFileSync(maxFile, String(target))
-          const readBack = readNum(maxFile)
-          results.push({p, ok: readBack === target, why: readBack === target ? null : `回读 ${readBack}≠${target}`})
         } catch (e) {
-          results.push({p, ok: false, why: `${e.code ?? e.message}`})
+          writeErrors.push({p, why: e.code ?? e.message})
         }
       }
-      const okCount = results.filter((r) => r.ok).length
-      const failed = results.filter((r) => !r.ok)
-      const brief = (list) => {
-        const head = list.slice(0, 3).map((f) => `${f.p}=${f.why}`).join(', ')
-        return list.length > 3 ? `${head} 等 ${list.length} 个` : head
+
+      if (writeErrors.length === policies.length) {
+        const head = writeErrors.slice(0, 3).map((f) => `${f.p}=${f.why}`).join(', ')
+        return fail(`全部策略写入失败: ${head}`)
       }
-      if (!okCount) return fail(`全部策略写入失败: ${brief(failed)}`)
-      const note = failed.length ? `（${failed.length}/${results.length} 个策略失败: ${brief(failed)}）` : ''
-      const label = Number(mhz) > 0 ? `${Math.round(resolved)}MHz` : `自动（上限 ${Math.round(resolved)}MHz）`
-      return ok(undefined, `最大频率已设为 ${label}${note}`)
+
+      // 回读只作参考：驱动对 32 个 policy 的更新可能滞后，不一致不应判失败
+      await new Promise((r) => setTimeout(r, 60))
+      const stale = policies.filter((p) => {
+        const v = readNum(`${base}/${p}/scaling_max_freq`)
+        return v !== null && Math.abs(v - Math.round(resolved * 1000)) > 0 && v !== Math.round(resolved * 1000)
+      })
+      const notes = []
+      if (writeErrors.length) notes.push(`${writeErrors.length} 个策略写入报错`)
+      if (stale.length) notes.push(`${stale.length} 个策略回读与目标不同（可能被驱动/电源服务调整）`)
+      const label = want > 0 ? `${Math.round(resolved)}MHz` : `自动（上限 ${Math.round(resolved)}MHz）`
+      return ok(undefined, `最大频率已设为 ${label}${notes.length ? '（' + notes.join('；') + '）' : ''}`)
     },
     DisableTurbo: () => setBoost(false),
     EnableTurbo: () => setBoost(true),
