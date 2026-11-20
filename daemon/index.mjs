@@ -9,6 +9,8 @@
 import {startServer} from './rpc.mjs'
 import {methods} from './methods.mjs'
 import {Ec} from './ec.mjs'
+import {loadConfig} from './hw/config.mjs'
+import {planBootActions, runBootActions} from './boot.mjs'
 
 const argv = process.argv.slice(2)
 const argValue = (n, d) => {
@@ -42,6 +44,28 @@ if (!ec.available) {
 }
 
 const server = startServer(SOCKET, dispatch, log, {mode: DEV ? 0o666 : 0o660})
+
+// ── 开机自动应用 ────────────────────────────────────────────────────────────
+// 设置页那 6 个"开机应用"开关在这里才真正生效：把 config 里勾选的性能参数重放一遍。
+// 放到 server 起来之后执行：前端可以先连上来，应用过程不会阻塞端口。
+async function applyBootConfig() {
+  let actions
+  try {
+    actions = planBootActions(loadConfig())
+  } catch (e) {
+    log(`开机应用：读取配置失败（${e.message}），跳过`)
+    return
+  }
+  if (actions.length === 0) return
+  const {applied, failed, skipped} = await runBootActions(actions, (group, method, args) =>
+    dispatch({group, method, args}),
+  )
+  if (applied.length) log(`开机应用：${applied.length} 项成功 —— ${applied.join('、')}`)
+  if (skipped.length) log(`开机应用：跳过 ${skipped.length} 项 —— ${skipped.join('、')}`)
+  if (failed.length) log(`开机应用：失败 ${failed.length} 项 —— ${failed.join('、')}`)
+}
+
+applyBootConfig().catch((e) => log(`开机应用异常：${e?.message ?? e}`))
 
 let closing = false
 for (const sig of ['SIGINT', 'SIGTERM']) {

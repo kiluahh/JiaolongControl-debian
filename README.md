@@ -76,6 +76,7 @@ sudo ./install.sh
 | GPU 监控 | ✅ | `nvidia-smi` |
 | GPU 曲线超频 | ❌ | Linux 无 NVAPI VF 曲线接口 |
 | CPU TDP / EDC / 温度墙 / CO | ✅ | 经 `ryzen_smu` 内核模块写 SMU 邮箱，AM5 命令表已验证（status=1） |
+| 开机自动应用 | ✅ | daemon 启动时把 config 里勾选的性能参数重放（CPU 档位/最大频率/睿频、SMU 逐项、全核或分核 CO、自动风扇曲线）；日志会打印成功/失败/跳过清单 |
 | 屏幕 OSD 覆盖层 | ❌ | Wayland 不允许应用自定位窗口 |
 | 托盘 | ⚠️ | GNOME 需 AppIndicator 扩展 |
 
