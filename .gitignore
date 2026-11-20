@@ -7,3 +7,5 @@ probe/report.txt
 .ref/
 probe/ec-report.json
 probe/ec-report.txt
+probe/fan-test.json
+probe/fan-test.txt

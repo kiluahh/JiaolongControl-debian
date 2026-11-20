@@ -60,3 +60,15 @@ sudo node probe/probe.mjs --skip=acpi,mifs
 1. `mifs.triedPaths` 全部失败 → 本机 `MiInterface` 路径或参数与上游不同，需要按 `.work/acpi/*.dsl` 重建
 2. `ec.reads.0x2000_chipID` 读到 `0xFF` → 端口被 ACPI EC 独占，EC 直写路线走不通，只能走 WMI
 3. `gpu.modprobe.err` 提示签名被拒 → Secure Boot 与模块签名不匹配（需要单独处理）
+
+## 写入测试（`fan-test.mjs`）
+
+```bash
+node probe/fan-test.mjs                  # 只打印计划（需 root 才能读）
+sudo node probe/fan-test.mjs --apply     # 真正执行：写 75% → 3 秒 → 回滚
+sudo node probe/fan-test.mjs --apply --duty=200   # 满速
+```
+
+行为：记录 `0x0751`/`0x1804`/`0x1809` 原值 → 写占空比 → 置 `0x0751` manual 位 →
+每 500ms 采样双风扇 RPM → **finally 无条件回滚**（Ctrl-C 也走同步回滚）。
+回滚失败会打印可以直接粘贴的手工恢复命令。
