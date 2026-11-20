@@ -1,0 +1,13 @@
+{
+  "name": "jiaolongcontrol-debian",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "蛟龙 16 Pro 控制中心的 Debian/Linux 移植",
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "app": "npm --prefix app start",
+    "daemon": "node daemon/index.mjs",
+    "probe": "node probe/probe.mjs --dry-run"
+  }
+}

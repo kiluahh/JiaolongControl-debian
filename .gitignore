@@ -9,3 +9,7 @@ probe/ec-report.json
 probe/ec-report.txt
 probe/fan-test.json
 probe/fan-test.txt
+.npm-cache/
+app/node_modules/
+.run/
+client/dist/

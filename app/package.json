@@ -1,0 +1,15 @@
+{
+  "name": "jiaolong-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JiaoLongControl Debian 外壳（Electron）",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "JLC_DEV_URL=http://127.0.0.1:5173 electron ."
+  },
+  "devDependencies": {
+    "electron": "^38.0.0"
+  }
+}

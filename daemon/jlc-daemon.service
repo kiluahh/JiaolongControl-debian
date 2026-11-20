@@ -1,0 +1,16 @@
+[Unit]
+Description=JiaoLongControl hardware daemon (EC/sysfs/NVIDIA)
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/sbin/modprobe acpi_call
+ExecStart=/usr/bin/env node /opt/jiaolong/daemon/index.mjs
+Restart=on-failure
+RestartSec=3
+# 只允许访问硬件接口，其余按默认沙箱
+NoNewPrivileges=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

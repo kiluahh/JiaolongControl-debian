@@ -9,6 +9,8 @@ import {ArcoResolver} from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Electron 用 file:// 加载 dist，必须用相对路径
+  base: './',
   plugins: [
     vue(),
     // devtools 面板仅开发模式启用, 避免注入生产构建
@@ -27,7 +29,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // 仅手动 npm run build 用; publish 时 csproj 的 BuildClientApp 会显式覆盖为 obj/ClientDist
-    outDir: '../../bin/publish/WebRoot',
+    outDir: 'dist',
   },
 }))
