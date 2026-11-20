@@ -3,7 +3,7 @@
  * 每个处理函数返回 {Success, Message, Data}。
  */
 import fs from 'node:fs'
-import {Ec, REG, MODE_BIT, PERF_MODE, FAN_DUTY_MAX} from './ec.mjs'
+import {Ec, REG, MODE_BIT, CUME_BIT, FAN_DUTY_MAX, applyPerformanceMode} from './ec.mjs'
 import * as sys from './hw/sysfs.mjs'
 import {nvidia} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
@@ -167,19 +167,30 @@ export const methods = {
   },
 
   PerformanceMode: {
+    // 依据本机 DSDT 的 PMSC：CUME→3(自定义) / TBME→2(性能) / UFME→0(安静) / 都不置位→1(平衡)
     Get: () =>
       ecGuard(() => {
-        const v = ec.readByte(REG.MODE) & ~MODE_BIT.MANUAL_FAN & ~MODE_BIT.MODE_ENABLE
-        if (v === PERF_MODE.PERFORMANCE) return ok(1)
-        if (v === PERF_MODE.QUIET) return ok(2)
+        const m = ec.readByte(REG.MODE)
+        const c = ec.readByte(REG.CUME)
+        if (c & CUME_BIT) return ok(0, '当前为自定义档（界面只支持三档）')
+        if (m & MODE_BIT.TBME) return ok(1)
+        if (m & MODE_BIT.UFME) return ok(2)
         return ok(0)
       }, '读取性能模式'),
     Set: (mode) =>
       ecGuard(() => {
         const m = Number(mode)
-        const val = m === 1 ? PERF_MODE.PERFORMANCE : m === 2 ? PERF_MODE.QUIET : PERF_MODE.BALANCE
-        ec.writeByte(REG.MODE, val)
-        return ok(undefined, '已切换')
+        const cur = ec.readByte(REG.MODE)
+        const cume = ec.readByte(REG.CUME)
+        // 切档时退出自定义档与手动风扇，保留 EC 维护的其它位
+        ec.writeByte(REG.CUME, cume & ~CUME_BIT)
+        const base = cur & ~(MODE_BIT.TBME | MODE_BIT.UFME | MODE_BIT.MANUAL_FAN)
+        const next = m === 1 ? base | MODE_BIT.TBME : m === 2 ? base | MODE_BIT.UFME : base
+        ec.writeByte(REG.MODE, next)
+        const readBack = ec.readByte(REG.MODE)
+        applyPerformanceMode() // 让固件应用该档位的风扇策略
+        const name = m === 1 ? '性能' : m === 2 ? '安静' : '平衡'
+        return ok(undefined, `已切到${name}档（0x0751=0x${readBack.toString(16)}）`)
       }, '设置性能模式'),
   },
 

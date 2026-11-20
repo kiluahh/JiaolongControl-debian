@@ -100,7 +100,8 @@ export const REG = {
   GPU_RPM_LO: 0x046d,
 
   BAREBONE_ID: 0x0740,
-  MODE: 0x0751,
+  MODE: 0x0751, // bit4=TBME(性能) bit7=UFME(安静) bit6=手动风扇
+  CUME: 0x0727, // bit6=自定义档（白灯）
   FN_LOCK: 0x074e,
   KBD_RGB_MODE: 0x0767,
   KBD_RGB_R: 0x0769,
@@ -116,18 +117,25 @@ export const REG = {
   FAN_TABLE_GPU: 0x0f50,
 }
 
-/** 0x0751 位定义（依据 uniwill/tuxedo 源码） */
+/** 0x0751 位定义（依据本机 DSDT 的 ECMG 字段与 PMSC 逻辑） */
 export const MODE_BIT = {
-  MANUAL_FAN: 0x40, // 手动风扇模式
-  MODE_ENABLE: 0x80, // 性能档使能位
+  TBME: 0x10, // 性能档（Turbo Mode Enable）
+  UFME: 0x80, // 安静档（User Fan Mode Enable）
+  MANUAL_FAN: 0x40, // 手动风扇（uniwill full fan mode）
 }
 
-/** 0x0751 性能档取值（蛟龙同平台公开值，本机 0xa0 = 均衡） */
-export const PERF_MODE = {
-  BALANCE: 0xa0,
-  PERFORMANCE: 0x00,
-  QUIET: 0x10,
+/** 0x0727 bit6 = CUME，官方控制中心的"自定义/白灯"档 */
+export const CUME_BIT = 0x40
+
+/** 调任意 ACPI 方法（整数参数），返回原始字符串 */
+export function acpiCall(methodPath, args = []) {
+  const tail = args.map((a) => (typeof a === 'number' ? '0x' + a.toString(16) : String(a))).join(' ')
+  fs.writeFileSync(CALL, tail ? `${methodPath} ${tail}` : methodPath)
+  return fs.readFileSync(CALL, 'utf8').replace(/\0/g, '').trim()
 }
+
+/** 让固件应用当前档位（DSDT: EC0.PMSF） */
+export const applyPerformanceMode = () => acpiCall('\\_SB.PCI0.SBRG.EC0.PMSF')
 
 /** 风扇占空比范围：0..200 */
 export const FAN_DUTY_MAX = 200

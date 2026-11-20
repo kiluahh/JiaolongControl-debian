@@ -220,3 +220,35 @@ toJson(): Promise<string>  // 内部 ipcRenderer.invoke('bridge', {group, method
 
 - 风扇写入需 `ECRW`，属真实控制；必须先记录原值、写入后回读、失败立即回滚。
 - 0x0751 是模式与手动位复用寄存器，写入必须 **read-modify-write**，不可整字节覆盖。
+
+## 13. 性能档机制（已实机验证，2026-11-20）
+
+DSDT 的 `ECMG` 区域（`OperationRegion (ECMG, SystemMemory, 0xFED50000, 0x1000)`）直接映射 EC RAM，
+其中定义了模式字段：
+
+```asl
+Offset (0x727), , 6, CUME, 1                                  // 自定义档（白灯）
+Offset (0x751), , 4, TBME, 1, , 2, UFME, 1                    // 性能 / 安静
+
+Method (PMSC) {
+    If (CUME)                  PMDD = 3   // 自定义
+    ElseIf (TBME && !UFME)     PMDD = 2   // 性能
+    ElseIf (!TBME && UFME)     PMDD = 0   // 安静
+    ElseIf (!TBME && !UFME)    PMDD = 1   // 平衡
+}
+```
+
+实机结果（写入后回读稳定 2s 以上）：
+
+| 档位 | 写入值 | 指示灯 | 风扇 |
+|---|---|---|---|
+| 平衡 | `0x0751 = 0x20` | 蓝 | 正常 |
+| 性能 | `0x0751 = 0x30` | 紫 | 正常 |
+| 安静 | `0x0751 = 0xa0` | 绿 | 明显变安静 |
+| 自定义 | `0x0727` bit6 = 1 | 白 | 官方工具专属，界面未做 |
+
+切档流程：**read-modify-write 位 → 调 `\_SB.PCI0.SBRG.EC0.PMSF()`**。
+手动风扇位 `0x40` 与模式位可共存，切档时清除。
+
+未完成：`APTC`（温度墙，`0x0783` 低 7 位，理论值 0x57/0x5A/0x5F）始终为 0。
+`PMSF` 里这段被 `\_SB.INOU.CSTM == 1` 挡住，调用 `CTAF(1)` 也未能打开——温度墙目前仍由 EC 自管。
