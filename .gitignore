@@ -23,3 +23,4 @@ probe/rgb-test.json
 probe/aod.json
 probe/smu.json
 probe/smu2.json
+probe/kbc.json
