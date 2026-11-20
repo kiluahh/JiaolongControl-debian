@@ -209,8 +209,15 @@ export const methods = {
         ec.updateBit(REG.KBD_RGB_MODE, 0x20, true) // bit5 = 应用颜色
         return ok(undefined, '颜色已应用')
       }, '设置键盘颜色'),
-    GetLightBrightness: () => ecGuard(() => ok(ec.readByte(REG.KBD_BL_STATUS) & 0x03), '读取键盘亮度'),
-    SetLightBrightness: () => fail('键盘亮度寄存器尚未确认，暂不写入'),
+    // 0x078c 是命令寄存器：bit1=电源位。0x02 关灯、0x00 开灯（实机验证）。
+    // 无明暗分级、无颜色控制——本机固件不通过这个寄存器暴露它们。
+    GetLightBrightness: () => ecGuard(() => ok(ec.readByte(REG.KBD_BL_STATUS) & 0x02 ? 0 : 3), '读取键盘背光'),
+    SetLightBrightness: (br) =>
+      ecGuard(() => {
+        const level = Number(br)
+        ec.writeByte(REG.KBD_BL_STATUS, level > 0 ? 0x00 : 0x02)
+        return ok(undefined, level > 0 ? '键盘背光已打开' : '键盘背光已关闭')
+      }, '设置键盘背光'),
   },
 
   LogoLight: {
