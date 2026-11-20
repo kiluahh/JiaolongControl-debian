@@ -17,3 +17,4 @@ app/.electron-cache/
 probe/mode-test.json
 probe/mode-test.txt
 probe/watch.json
+probe/ec-diff.json
