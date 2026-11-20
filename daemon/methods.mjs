@@ -8,6 +8,17 @@ import * as sys from './hw/sysfs.mjs'
 import {nvidia} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
 import * as smu from './hw/smu.mjs'
+import {
+  LEVEL_MAX,
+  decodeBrightness,
+  decodeChannel,
+  encodeBrightness,
+  encodeChannel,
+  isRainbow,
+  modeForColor,
+  modeForRainbow,
+  needsWake,
+} from './hw/kbc.mjs'
 
 const ec = new Ec()
 
@@ -160,6 +171,41 @@ export const methods = {
       }, '设置性能模式'),
   },
 
+  Keyboard: {
+    // 协议见 daemon/hw/kbc.mjs 顶部注释：来源 TUXEDO GPL 驱动 + 本机实测复核
+    GetColor: () =>
+      ecGuard(
+        () =>
+          ok({
+            red: decodeChannel(ec.readByte(REG.KBD_RGB_R)),
+            green: decodeChannel(ec.readByte(REG.KBD_RGB_G)),
+            blue: decodeChannel(ec.readByte(REG.KBD_RGB_B)),
+          }),
+        '读取键盘颜色',
+      ),
+    SetColor: (r, g, b) =>
+      ecGuard(() => {
+        ec.writeByte(REG.KBD_RGB_R, encodeChannel(r))
+        ec.writeByte(REG.KBD_RGB_G, encodeChannel(g))
+        ec.writeByte(REG.KBD_RGB_B, encodeChannel(b))
+        // 0x20 = 退出呼吸 + 触发 apply（一次性，EC 执行后会自行清位）
+        ec.writeByte(REG.KBD_RGB_MODE, modeForColor())
+        return ok(undefined, '颜色已应用')
+      }, '设置键盘颜色'),
+    GetLightBrightness: () => ecGuard(() => ok(decodeBrightness(ec.readByte(REG.KBD_BL_STATUS))), '读取键盘背光'),
+    SetLightBrightness: (br) =>
+      ecGuard(() => {
+        const level = Math.max(0, Math.min(LEVEL_MAX, Math.round(Number(br) || 0)))
+        // 背光关闭时 EC 不会应用 0x078c 的新值，需先把蓝色即时亮度抬起来
+        if (level > 0 && needsWake(ec.readByte(REG.KBD_BL_BLUE_IMMEDIATE))) {
+          ec.writeByte(REG.KBD_BL_BLUE_IMMEDIATE, 0x01)
+        }
+        const cur = ec.readByte(REG.KBD_BL_STATUS)
+        ec.writeByte(REG.KBD_BL_STATUS, encodeBrightness(cur, level))
+        return ok(undefined, level === 0 ? '键盘背光已关闭' : `键盘背光档位 ${level}`)
+      }, '设置键盘背光'),
+  },
+
   LogoLight: {
     Get: () => fail('logo 灯寄存器尚未确认'),
     Set: () => fail('logo 灯寄存器尚未确认'),
@@ -218,6 +264,22 @@ export const methods = {
       return ok(undefined, '自动风扇已停止')
     },
     IsRunning: () => ok(autoFan.running),
+  },
+
+  KeyboardGradient: {
+    // 硬件自带的呼吸/彩虹（0x0767 bit7），不再用定时器逐帧写 EC
+    Start: () =>
+      ecGuard(() => {
+        const mode = ec.readByte(REG.KBD_RGB_MODE)
+        ec.writeByte(REG.KBD_RGB_MODE, modeForRainbow(mode))
+        return ok(undefined, '彩虹灯效已开启')
+      }, '开启彩虹灯效'),
+    Stop: () =>
+      ecGuard(() => {
+        ec.writeByte(REG.KBD_RGB_MODE, modeForColor())
+        return ok(undefined, '彩虹灯效已停止')
+      }, '停止彩虹灯效'),
+    IsRunning: () => ecGuard(() => ok(isRainbow(ec.readByte(REG.KBD_RGB_MODE))), '读取彩虹灯效状态'),
   },
 
   NvidiaGpu: {

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "at": "2026-11-20T07:54:21.403Z",
+  "results": [
+    {
+      "name": "颜色：纯红（通道 50,0,0）+ MODE=0x20",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "颜色：纯绿（通道 0,50,0）+ MODE=0x20",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "颜色：纯蓝（通道 0,0,50）+ MODE=0x20",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "颜色：纯白（通道 50,50,50）+ MODE=0x20",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "恢复呼吸：MODE=0x80",
+      "answer": "y",
+      "pass": true
+    }
+  ]
+}

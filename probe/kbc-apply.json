@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "at": "2026-11-20T07:53:21.300Z",
+  "saved": {
+    "bl": 128,
+    "mode": 128,
+    "rgb": [
+      255,
+      255,
+      255
+    ]
+  },
+  "results": [
+    {
+      "name": "档位 4（最亮）：0x078c = 0x80 | 0x10",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "档位 2：0x078c = 0x40 | 0x10",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "档位 1：0x078c = 0x20 | 0x10",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "档位 0（关灯）：0x078c = 0x10",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "从熄灭状态重新点亮：唤醒 + 档位 4",
+      "answer": "y",
+      "pass": true
+    },
+    {
+      "name": "颜色：0x0769=50(红) 0x076a=0 0x076b=0，然后 0x0767 |= 0x20",
+      "answer": "n",
+      "pass": false
+    }
+  ]
+}

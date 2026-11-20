@@ -21,6 +21,14 @@ export enum SystemPerMode {
   QuietMode = 2,
 }
 
+export enum RGBKeyboardBrightnessLevel {
+  Level_0 = 0,
+  Level_1 = 1,
+  Level_2 = 2,
+  Level_3 = 3,
+  Level_4 = 4,
+}
+
 export interface FanSpeedInfo {
   CPUFanSpeed: number
   GPUFanSpeed: number
@@ -131,6 +139,12 @@ export interface BridgeApi {
     Get(): HostBridgePromise<ResultState>
     Set(state: ResultState): HostBridgePromise<void>
   }
+  Keyboard: {
+    GetColor(): HostBridgePromise<ColorInfo>
+    SetColor(r: number, g: number, b: number): HostBridgePromise<void>
+    GetLightBrightness(): HostBridgePromise<RGBKeyboardBrightnessLevel>
+    SetLightBrightness(br: RGBKeyboardBrightnessLevel): HostBridgePromise<void>
+  }
   PerformanceMode: {
     Get(): HostBridgePromise<SystemPerMode>
     Set(mode: SystemPerMode): HostBridgePromise<void>
@@ -145,6 +159,11 @@ export interface BridgeApi {
     IsEnabled(): HostBridgePromise<boolean>
   }
   AutoFan: {
+    Start(): HostBridgePromise<void>
+    Stop(): HostBridgePromise<void>
+    IsRunning(): HostBridgePromise<boolean>
+  }
+  KeyboardGradient: {
     Start(): HostBridgePromise<void>
     Stop(): HostBridgePromise<void>
     IsRunning(): HostBridgePromise<boolean>
@@ -322,6 +341,14 @@ export const LogoLight = {
   Set: (state: ResultState) => call(raw.LogoLight.Set(state)),
 }
 
+export const Keyboard = {
+  GetColor: () => call(raw.Keyboard.GetColor()),
+  SetColor: (r: number, g: number, b: number) =>
+    call(raw.Keyboard.SetColor(toByte(r), toByte(g), toByte(b))),
+  GetLightBrightness: () => call(raw.Keyboard.GetLightBrightness()),
+  SetLightBrightness: (br: RGBKeyboardBrightnessLevel) => call(raw.Keyboard.SetLightBrightness(br)),
+}
+
 export const PerformanceMode = {
   Get: () => call(raw.PerformanceMode.Get()),
   Set: (mode: SystemPerMode) => call(raw.PerformanceMode.Set(mode)),
@@ -337,6 +364,12 @@ export const AutoFanControl = {
   Start: () => call(raw.AutoFan.Start()),
   Stop: () => call(raw.AutoFan.Stop()),
   IsRunning: () => call(raw.AutoFan.IsRunning()),
+}
+
+export const KeyboardGradient = {
+  Start: () => call(raw.KeyboardGradient.Start()),
+  Stop: () => call(raw.KeyboardGradient.Stop()),
+  IsRunning: () => call(raw.KeyboardGradient.IsRunning()),
 }
 
 type NvidiaGpuRaw = BridgeApi['NvidiaGpu']

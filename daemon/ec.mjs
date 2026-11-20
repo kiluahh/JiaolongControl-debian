@@ -107,7 +107,8 @@ export const REG = {
   KBD_RGB_R: 0x0769,
   KBD_RGB_G: 0x076a,
   KBD_RGB_B: 0x076b,
-  KBD_BL_STATUS: 0x078c,
+  KBD_BL_STATUS: 0x078c, // bits[7:5]=档位0..4(0=关) bit4=apply 触发
+  KBD_BL_BLUE_IMMEDIATE: 0x1808, // 蓝色即时亮度；背光关闭时写入 0x078c 不生效，需先抬这个值
   FAN_CTRL_STATUS: 0x078e,
 
   DUTY_CPU: 0x1804,
