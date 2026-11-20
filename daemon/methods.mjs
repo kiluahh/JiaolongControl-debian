@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import {Ec, REG, MODE_BIT, CUME_BIT, FAN_DUTY_MAX, applyPerformanceMode} from './ec.mjs'
 import * as sys from './hw/sysfs.mjs'
-import {nvidia} from './hw/gpu.mjs'
+import {nvidia, clockRange, lockClock, resetClock} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
 import {ledStates, readLedEntries} from './hw/locks.mjs'
 import * as smu from './hw/smu.mjs'
@@ -299,12 +299,31 @@ export const methods = {
     GetGpuMemoryClock: () => gpuNum('memClockMhz'),
     GetGpuTemperature: () => gpuNum('tempC'),
     GetGpuFanSpeed: () => gpuNum('fanPct'),
-    GetGpuCoreClockRange: () => fail('Linux 无 NVAPI 频率范围接口'),
-    GetGpuMemoryClockRange: () => fail('Linux 无 NVAPI 频率范围接口'),
-    LockGpuClock: () => fail('暂未实现（需 nvidia-smi -lgc）'),
-    ResetGpuClock: () => fail('暂未实现'),
-    LockMemoryClock: () => fail('暂未实现'),
-    ResetMemoryClock: () => fail('暂未实现'),
+    // 频率下限：nvidia-smi -lgc/-lmc（家用的 NVAPI 锁频在 Linux 上的对应物）
+    GetGpuCoreClockRange: () => {
+      const r = clockRange('gr')
+      return r ? ok({Min: r.min, Max: r.max}) : fail('nvidia-smi 读不到核心频率档位')
+    },
+    GetGpuMemoryClockRange: () => {
+      const r = clockRange('mem')
+      return r ? ok({Min: r.min, Max: r.max}) : fail('nvidia-smi 读不到显存频率档位')
+    },
+    LockGpuClock: (mhz) => {
+      const r = lockClock('gr', mhz)
+      return r.ok ? ok({AppliedMhz: r.applied}, r.message) : fail(r.message)
+    },
+    ResetGpuClock: () => {
+      const r = resetClock('gr')
+      return r.ok ? ok(undefined, r.message) : fail(r.message)
+    },
+    LockMemoryClock: (mhz) => {
+      const r = lockClock('mem', mhz)
+      return r.ok ? ok({AppliedMhz: r.applied}, r.message) : fail(r.message)
+    },
+    ResetMemoryClock: () => {
+      const r = resetClock('mem')
+      return r.ok ? ok(undefined, r.message) : fail(r.message)
+    },
     GetGpuCurveCapabilities: () => ok({Supported: false, Reason: 'Linux 无 NVAPI VF 曲线接口', GpuName: '', CoreOffsetMinMhz: 0, CoreOffsetMaxMhz: 0}),
     GetGpuCurveStatus: () => fail('Linux 无 NVAPI VF 曲线接口'),
     SetGpuOffsets: () => fail('Linux 无 NVAPI VF 曲线接口'),

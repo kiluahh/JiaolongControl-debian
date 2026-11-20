@@ -198,9 +198,10 @@ async function handleResetNormal() {
       Message.error(memClockRes.Message || '显存频率重置失败')
       return false
     }
+    // 0 = 不限制。不能写回 Max：那样"重置"之后再点"应用"会把显卡锁死在最高频
     if (GPUData.value) {
-      GPUData.value.GpuClock = coreClockRange.value.Max
-      GPUData.value.MemoryClock = memClockRange.value.Max
+      GPUData.value.GpuClock = 0
+      GPUData.value.MemoryClock = 0
     }
     return '常规设置已恢复默认'
   }, 'info', '常规设置已恢复默认', '重置值保存失败', '重置失败，请检查显卡驱动及桥接服务')
