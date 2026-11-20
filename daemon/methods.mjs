@@ -457,8 +457,10 @@ export const methods = {
         'CapsLock/NumLock 来自键盘 LED',
       )
     },
-    SetCapsLock: () => fail('由外壳用 X11/Wayland 接口实现'),
-    SetNumLock: () => fail('由外壳用 X11/Wayland 接口实现'),
+    // 面板只能"读"这两个键的状态；切换需要注入按键事件（GNOME Wayland 不接受
+    // wtype 的虚拟键盘协议，得走 uinput），本机暂未实现——不要把实现备注抛给用户
+    SetCapsLock: () => fail('面板不支持切换大写锁，请直接按键盘上的 CapsLock 键'),
+    SetNumLock: () => fail('面板不支持切换数字键锁，请直接按键盘上的 NumLock 键'),
     SetFnLock: () => fail('Fn 锁寄存器尚未确认'),
     SetTouchpadLock: () => fail('触摸板锁由外壳写 GNOME 设置（gsettings send-events）'),
   },
