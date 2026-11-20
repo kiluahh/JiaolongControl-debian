@@ -94,6 +94,9 @@ function pruneLegacy(cfg) {
   if (cfg.App) delete cfg.App.BootAdvancedFanControlSystem
   if (cfg.Osd) {
     for (const k of Object.keys(cfg.Osd)) if (!(k in DEFAULTS.Osd)) delete cfg.Osd[k]
+    // 居中位置已取消（OSD 只贴屏幕左右角），旧配置落到右下
+    const POSITIONS = ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight', 'Custom']
+    if (!POSITIONS.includes(cfg.Osd.Position)) cfg.Osd.Position = 'BottomRight'
   }
 }
 
