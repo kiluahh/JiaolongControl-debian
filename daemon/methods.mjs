@@ -311,19 +311,80 @@ export const methods = {
 
   Power: {
     SetCPUMaxFrequency: (mhz) => {
-      try {
-        const v = Math.round(Number(mhz) * 1000)
-        if (!v) return fail('频率无效')
-        for (const p of fs.readdirSync('/sys/devices/system/cpu/cpufreq').filter((d) => d.startsWith('policy'))) {
-          fs.writeFileSync(`/sys/devices/system/cpu/cpufreq/${p}/scaling_max_freq`, String(v))
+      const want = Number(mhz)
+      if (!Number.isFinite(want) || want <= 0) return fail(`频率值无效: ${mhz}`)
+      const base = '/sys/devices/system/cpu/cpufreq'
+      const readNum = (f) => {
+        try {
+          return Number(fs.readFileSync(f, 'utf8').trim())
+        } catch {
+          return null
         }
-        return ok(undefined, '已设置最大频率')
+      }
+      let policies = []
+      try {
+        policies = fs.readdirSync(base).filter((d) => d.startsWith('policy'))
+      } catch (e) {
+        return fail(`读取 cpufreq 失败: ${e.message}`)
+      }
+      if (!policies.length) return fail('没有找到 cpufreq policy')
+
+      const results = []
+      for (const p of policies) {
+        const dir = `${base}/${p}`
+        const maxFile = `${dir}/scaling_max_freq`
+        const minFile = `${dir}/scaling_min_freq`
+        try {
+          if (!fs.existsSync(maxFile)) {
+            results.push({p, ok: false, why: '无 scaling_max_freq'})
+            continue
+          }
+          // 钳到硬件范围，否则 amd-pstate 会 EINVAL
+          const infoMax = readNum(`${dir}/cpuinfo_max_freq`)
+          const infoMin = readNum(`${dir}/cpuinfo_min_freq`)
+          let target = Math.round(want * 1000)
+          if (infoMax && target > infoMax) target = infoMax
+          if (infoMin && target < infoMin) target = infoMin
+          // 目标低于当前 min 时先降 min，否则 EINVAL
+          const curMin = readNum(minFile)
+          if (curMin && target < curMin) fs.writeFileSync(minFile, String(target))
+          fs.writeFileSync(maxFile, String(target))
+          const readBack = readNum(maxFile)
+          results.push({p, ok: readBack === target, why: readBack === target ? null : `回读 ${readBack}≠${target}`})
+        } catch (e) {
+          results.push({p, ok: false, why: `${e.code ?? e.message}`})
+        }
+      }
+      const okCount = results.filter((r) => r.ok).length
+      const failed = results.filter((r) => !r.ok)
+      if (!okCount) return fail(`全部策略写入失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}`)
+      const note = failed.length ? `（${failed.length}/${results.length} 个策略失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}）` : ''
+      return ok(undefined, `最大频率已设为 ${Math.round(want)}MHz${note}`)
+    },
+    DisableTurbo: () => setBoost(false),
+    EnableTurbo: () => setBoost(true),
+    GetCpuFreqLimits: () => {
+      const base = '/sys/devices/system/cpu/cpufreq'
+      try {
+        const p = fs.readdirSync(base).find((d) => d.startsWith('policy')) ?? 'policy0'
+        const readNum = (f) => {
+          try {
+            return Number(fs.readFileSync(`${base}/${p}/${f}`, 'utf8').trim())
+          } catch {
+            return null
+          }
+        }
+        return ok({
+          min: readNum('cpuinfo_min_freq'),
+          max: readNum('cpuinfo_max_freq'),
+          scalingMin: readNum('scaling_min_freq'),
+          scalingMax: readNum('scaling_max_freq'),
+          governor: fs.existsSync(`${base}/${p}/scaling_governor`) ? fs.readFileSync(`${base}/${p}/scaling_governor`, 'utf8').trim() : null,
+        })
       } catch (e) {
         return fail(e.message)
       }
     },
-    DisableTurbo: () => setBoost(false),
-    EnableTurbo: () => setBoost(true),
   },
 
   SystemInfo: {
@@ -420,15 +481,22 @@ function gpuNum(key) {
 }
 
 function setBoost(on) {
+  const tried = []
   for (const p of ['/sys/devices/system/cpu/cpufreq/boost', '/sys/devices/system/cpu/boost']) {
+    if (!fs.existsSync(p)) {
+      tried.push(`${p}=不存在`)
+      continue
+    }
     try {
       fs.writeFileSync(p, on ? '1' : '0')
-      return ok(undefined, on ? '已开启加速' : '已关闭加速')
-    } catch {
-      /* 试下一个 */
+      const back = fs.readFileSync(p, 'utf8').trim()
+      if (back === (on ? '1' : '0')) return ok(undefined, on ? '已开启睿频' : '已关闭睿频')
+      tried.push(`${p}=回读 ${back}`)
+    } catch (e) {
+      tried.push(`${p}=${e.code ?? e.message}`)
     }
   }
-  return fail('本机不支持 boost 开关')
+  return fail(`睿频开关写入失败: ${tried.join('; ')}`)
 }
 
 let lastVolume = {Volume: 50, Muted: false}
