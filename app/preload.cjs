@@ -9,6 +9,7 @@
  * 因为 contextIsolation 关闭、nodeIntegration 关闭，这里可以直接改写 window。
  */
 const {ipcRenderer} = require('electron')
+const {createBridge} = require('./shim.cjs')
 
 const memo = new Map()
 
@@ -20,42 +21,11 @@ function invoke(group, method, args) {
     (e) => JSON.stringify({Success: false, Message: String(e?.message ?? e)}),
   )
   memo.set(key, p)
-  setTimeout(() => memo.delete(key), 1000)
+  setTimeout(() => memo.delete(key), 1000) // 与前端 1s 缓存语义一致
   return p
 }
 
-/** 返回带 toJson() 的 thenable，形状与 WebView2 hostObjects 一致 */
-function makeCall(group, method) {
-  return (...args) => {
-    const json = () => invoke(group, method, args)
-    const thenable = {
-      toJson: json,
-      then: (onFulfilled, onRejected) => json().then(onFulfilled, onRejected),
-      catch: (onRejected) => json().catch(onRejected),
-      finally: (fn) => json().finally(fn),
-    }
-    return thenable
-  }
-}
-
-const bridgeTarget = {}
-const bridgeProxy = new Proxy(bridgeTarget, {
-  get(target, group) {
-    if (typeof group !== 'string') return undefined
-    if (!target[group]) {
-      target[group] = new Proxy(
-        {},
-        {
-          get(_t, method) {
-            if (typeof method !== 'string') return undefined
-            return makeCall(group, method)
-          },
-        },
-      )
-    }
-    return target[group]
-  },
-})
+const bridgeProxy = createBridge(invoke)
 
 const listeners = new Map()
 

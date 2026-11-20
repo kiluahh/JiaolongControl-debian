@@ -8,6 +8,7 @@ import {callDaemon, pingDaemon} from './bridge.mjs'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const DEV_URL = process.env.JLC_DEV_URL || null
+const SMOKE = process.env.JLC_SMOKE === '1'
 const ICON = path.join(ROOT, 'client', 'src', 'assets', 'icon', 'icon.png')
 
 let win = null
@@ -48,7 +49,18 @@ function createWindow() {
     }
   }
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (!SMOKE) win.show()
+  })
+
+  if (process.env.JLC_DEBUG === '1') win.webContents.openDevTools({mode: 'detach'})
+
+  // F12 打开调试器，Ctrl+Shift+I 同理（无边框窗口没有菜单栏）
+  win.webContents.on('before-input-event', (_e, input) => {
+    if (input.type === 'keyDown' && (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i'))) {
+      win.webContents.toggleDevTools()
+    }
+  })
   win.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault()
@@ -106,7 +118,30 @@ ipcMain.on('jlc:window', (e, message) => {
 
 app.whenReady().then(async () => {
   createWindow()
-  buildTray()
+  if (!SMOKE) buildTray()
+
+  if (SMOKE) {
+    // 自检：加载前端 → 走 preload shim → IPC → daemon，验证整条链路
+    win.webContents.on('did-finish-load', async () => {
+      try {
+        const js = await win.webContents.executeJavaScript(`(async () => {
+          const b = window.chrome.webview.hostObjects.bridge
+          const cpu = JSON.parse(await b.CPU.GetCpuInfo().toJson())
+          const fan = JSON.parse(await b.Fan.GetFanSpeed().toJson())
+          return JSON.stringify({cpu, fan})
+        })()`)
+        console.log('SMOKE_JS', js)
+        const caps = await callDaemon('Sys', 'Capabilities')
+        console.log('SMOKE_DAEMON', JSON.stringify(caps))
+        console.log('SMOKE_OK')
+      } catch (e) {
+        console.log('SMOKE_FAIL', e?.message ?? e)
+      } finally {
+        app.isQuitting = true
+        app.exit(0)
+      }
+    })
+  }
 
   const ping = await pingDaemon()
   if (!ping.Success) {

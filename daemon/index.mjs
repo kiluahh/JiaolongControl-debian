@@ -18,6 +18,7 @@ const argValue = (n, d) => {
 
 const SOCKET = argValue('socket', process.env.JLC_SOCKET || '/run/jlc.sock')
 const VERBOSE = argv.includes('--verbose')
+const DEV = argv.includes('--dev') // 0666 权限，方便非 root 试跑
 
 const ts = () => new Date().toISOString().slice(11, 19)
 const log = (msg) => process.stderr.write(`[${ts()}] ${msg}\n`)
@@ -40,7 +41,7 @@ if (!ec.available) {
   log('警告：/proc/acpi/call 不可用（需要 root + acpi_call 模块），硬件控制将全部失败')
 }
 
-const server = startServer(SOCKET, dispatch, log)
+const server = startServer(SOCKET, dispatch, log, {mode: DEV ? 0o666 : 0o660})
 
 let closing = false
 for (const sig of ['SIGINT', 'SIGTERM']) {

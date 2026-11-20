@@ -13,3 +13,4 @@ probe/fan-test.txt
 app/node_modules/
 .run/
 client/dist/
+app/.electron-cache/

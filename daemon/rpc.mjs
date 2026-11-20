@@ -8,7 +8,7 @@ import path from 'node:path'
  * @param {(req:{group:string,method:string,args:any[]}) => Promise<any>|any} dispatch
  * @param {(msg:string)=>void} log
  */
-export function startServer(socketPath, dispatch, log = () => {}) {
+export function startServer(socketPath, dispatch, log = () => {}, {mode = 0o660} = {}) {
   try {
     fs.mkdirSync(path.dirname(socketPath), {recursive: true})
   } catch {}
@@ -51,7 +51,7 @@ export function startServer(socketPath, dispatch, log = () => {}) {
 
   server.listen(socketPath, () => {
     try {
-      fs.chmodSync(socketPath, 0o660)
+      fs.chmodSync(socketPath, mode)
       const gid = lookupGroup('jlc')
       if (gid !== null) fs.chownSync(socketPath, 0, gid)
     } catch (e) {
