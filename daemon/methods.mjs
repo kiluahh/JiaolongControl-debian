@@ -359,8 +359,12 @@ export const methods = {
       }
       const okCount = results.filter((r) => r.ok).length
       const failed = results.filter((r) => !r.ok)
-      if (!okCount) return fail(`全部策略写入失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}`)
-      const note = failed.length ? `（${failed.length}/${results.length} 个策略失败: ${failed.map((f) => `${f.p}=${f.why}`).join(', ')}）` : ''
+      const brief = (list) => {
+        const head = list.slice(0, 3).map((f) => `${f.p}=${f.why}`).join(', ')
+        return list.length > 3 ? `${head} 等 ${list.length} 个` : head
+      }
+      if (!okCount) return fail(`全部策略写入失败: ${brief(failed)}`)
+      const note = failed.length ? `（${failed.length}/${results.length} 个策略失败: ${brief(failed)}）` : ''
       const label = Number(mhz) > 0 ? `${Math.round(resolved)}MHz` : `自动（上限 ${Math.round(resolved)}MHz）`
       return ok(undefined, `最大频率已设为 ${label}${note}`)
     },
