@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {computed, onMounted} from 'vue'
+import {computed, onMounted, onUnmounted} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import {type CommandResult, Osd} from '@/utils/bridge'
 import {useLocksStore} from '@/stores/locks'
@@ -7,16 +7,17 @@ import SettingToggle from '@/components/common/SettingToggle.vue'
 import LogoLight from './Settings/components/LogoLight.vue'
 import GPUDirectConnection from './Settings/components/GPUDirectConnection.vue'
 
-// ===== 锁定控制: 直接切换四项锁定状态 =====
-// 状态来自 locks store: C# 检测到变化 (原生热键/EC 事件/轮询) 会实时推送, 按钮即时响应
+// ===== 锁定控制: 四项锁定状态 =====
+// CapsLock/NumLock: daemon 读键盘 LED 真值; TouchpadLock: 外壳读 GNOME 设置。
+// 页面挂载期间轮询刷新(用户直接按物理键时面板也要跟上), 主动切换后另有 lock-states-changed 推送
 type LockKey = 'CapsLock' | 'NumLock' | 'FnLock' | 'TouchpadLock'
 const locksStore = useLocksStore()
 const locks = computed(() => locksStore.locks)
 const lockItems: Array<{ key: LockKey; label: string; hint: string }> = [
-  { key: 'CapsLock', label: '大写键锁定', hint: '模拟系统按键切换' },
-  { key: 'NumLock', label: '数字键锁定', hint: '模拟系统按键切换' },
-  { key: 'FnLock', label: '功能键锁定', hint: '经 EC 写入切换' },
-  { key: 'TouchpadLock', label: '触摸板锁定', hint: '经 EC 写入切换' },
+  { key: 'CapsLock', label: '大写键锁定', hint: '显示键盘 LED 状态 · 按物理键切换' },
+  { key: 'NumLock', label: '数字键锁定', hint: '显示键盘 LED 状态 · 按物理键切换' },
+  { key: 'FnLock', label: '功能键锁定', hint: '待接入 · 显示为未知' },
+  { key: 'TouchpadLock', label: '触摸板锁定', hint: '经 GNOME 设置切换' },
 ]
 
 async function refreshLocks() {
@@ -49,17 +50,32 @@ async function toggleLock(key: LockKey) {
     Message.warning('该锁定状态读取失败, 无法切换')
     return
   }
+  // 面板对这两个键只能读: 模拟按键要注入事件 (GNOME Wayland 不支持 wtype), 没接
+  if (key === 'CapsLock' || key === 'NumLock') {
+    Message.info(`请直接按键盘上的 ${key} 键切换, 面板只显示状态`)
+    return
+  }
   try {
     const res = await lockSetters[key](!cur)
     if (!res.Success) Message.error(res.Message)
   } catch {
     Message.error('设置失败')
   }
-  // 状态刷新由 C# 的 lock-states-changed 推送完成 (模拟按键约 120ms 防抖后推送)
+  // 触摸板锁写入成功后由外壳推送 lock-states-changed, 按钮即时刷新
 }
+
+// 用户可能直接按物理键, 面板必须自己跟上; 1.5s 一次, sysfs 读取开销可忽略
+const LOCK_POLL_MS = 1500
+let lockTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   refreshLocks()
+  lockTimer = setInterval(refreshLocks, LOCK_POLL_MS)
+})
+
+onUnmounted(() => {
+  if (lockTimer) clearInterval(lockTimer)
+  lockTimer = null
 })
 </script>
 
@@ -102,7 +118,7 @@ onMounted(() => {
               </button>
             </div>
             <p class="text-[10px] text-gray-600 leading-relaxed">
-              点击切换状态并同步弹出 OSD 提示；功能键/触摸板锁定经 EC 写入，若机型不支持则显示未知
+              大写/数字锁只能显示键盘 LED 真值，切换请按物理键；触摸板锁写 GNOME 设置；功能键锁待接入（显示为未知）
             </p>
           </div>
 
@@ -128,15 +144,16 @@ onMounted(() => {
             <h2 class="text-[13px] font-semibold text-gray-300 mb-3">名词解释</h2>
             <div class="text-[11px] text-gray-500 leading-relaxed space-y-2">
               <p>
-                <strong>大写/数字键锁定</strong>:
-                系统级键盘切换状态，通过模拟按键实现，与物理键盘指示灯保持同步。
+                <strong>大写/数字键锁定</strong>: 读取键盘 LED 状态，与物理指示灯一致；面板不模拟按键
+                （Wayland 下需注入按键事件，暂未实现）。
               </p>
               <p>
-                <strong>功能键锁定 (Fn Lock)</strong>: 切换 F1-F12 与媒体功能键的默认行为，经 EC
-                直接写入。
+                <strong>功能键锁定 (Fn Lock)</strong>: 切换 F1-F12 与媒体功能键的默认行为。EC 寄存器
+                0x074e bit4 已定位，本机尚未验证。
               </p>
               <p>
-                <strong>触摸板锁定</strong>: 启用或禁用触摸板，经 EC 直接写入。
+                <strong>触摸板锁定</strong>: 通过 GNOME 设置（gsettings send-events）禁用/启用触摸板，
+                写入后回读校验。
               </p>
             </div>
           </div>
