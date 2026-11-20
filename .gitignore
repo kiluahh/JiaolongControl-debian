@@ -25,3 +25,4 @@ probe/smu.json
 probe/smu2.json
 probe/kbc.json
 probe/kbc-modes.json
+probe/kbc-power.json
