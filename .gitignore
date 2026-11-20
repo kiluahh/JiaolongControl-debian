@@ -4,3 +4,6 @@ dist/
 probe/.work/
 probe/report.json
 probe/report.txt
+.ref/
+probe/ec-report.json
+probe/ec-report.txt

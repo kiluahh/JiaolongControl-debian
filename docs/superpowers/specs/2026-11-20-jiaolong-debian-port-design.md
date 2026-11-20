@@ -155,3 +155,36 @@ toJson(): Promise<string>  // 内部 ipcRenderer.invoke('bridge', {group, method
 | 7 | 汇总判定表 ✅/⚠️/❌ + 证据 | 直接决定 P1 范围 |
 
 纪律：**只发 Get 不发 Set**；单项失败继续执行；所有命令输出与错误写入报告。
+
+---
+
+## 11. 第一轮探针实测结论（2026-11-20，已推翻原假设）
+
+| 项 | 结果 | 影响 |
+|---|---|---|
+| ACPI 表 | 23 张全部反编译，`MIFS`/`MiInterface`/`MIFS_0` **零命中** | 上游 WMI 路径在本机**不存在**，全部 Set/Get 方法号作废 |
+| `/dev/port` | root 下 open 返回 `EPERM`；`/sys/kernel/security/lockdown` = `[integrity]` | 内核 lockdown 封死用户态端口 I/O，上游 EC 直写（0x4E/0x4F）**永久不可用** |
+| WMI 设备 | `PNP0C14:00` = `\_SB.AMW0`（`_UID 1`，1 字节实例透传）、`AOD`（SSDT8，AMD SMU 邮箱） | 与上游 `MIFS_0` 是两代不同接口 |
+| **EC 控制接口** | `Device (INOU)`，`_HID "INOU0000"`，提供 `ECRR(addr)` / `ECRW(addr,val)`，EC RAM 映射在 `0xFED50000` | **这是本机唯一可用的控制通路**；属 Uniwill/Tongfang 平台标准接口 |
+| NVIDIA | `modprobe nvidia` 后 `nvidia-smi` 正常：RTX 5060 Laptop, 8151 MiB, 590.48.01 | GPU 监控可用，未受 Secure Boot 影响 |
+
+### 结论
+
+1. 硬件层从"复刻 `MiInterface`"改为"用 `acpi_call` 调 `\_SB.INOU.ECRR/ECRW`"。
+2. 不需要写内核模块，也不需要 DKMS：`/proc/acpi/call` 不受 lockdown 限制。
+3. root 仍然必需（`/proc/acpi/call` 仅 root 可写），架构里的 `jlc-daemon` 保持不变。
+4. EC 地址表来自同平台驱动（mechrevo-drivers / TUXEDO uniwill）与本机 DSDT 的 `PL1L..PL4L` 字段，需用第二轮探针实测确认。
+
+### 已知地址（待第二轮验证）
+
+| 地址 | 含义 | 来源 |
+|---|---|---|
+| 0x043e / 0x044f | CPU / GPU EC 温度 | mechrevo-drivers 实机验证 |
+| 0x0464/0x0465、0x046c/0x046d | CPU / GPU 风扇转速高/低字节 | 同上 |
+| 0x0740 | 机种 ID | 同上 |
+| 0x0727 | 自定义性能档 | uniwill 接口定义 |
+| 0x074e | Fn 锁 | 同上 |
+| 0x0767 / 0x0769-0x076b | 键盘 RGB 模式 / R,G,B | 同上 |
+| 0x078c / 0x078e | 键盘背光状态 / 风扇控制能力位（0x40） | 同上 |
+| 0x006a/0x006b/0x006e/0x006f | PL1/PL2/PL3/PL4 | 本机 DSDT `ECXP` 字段 |
+| 0x008a/0x008b/0x008f | EC 命令邮箱 LDAT/HDAT/CMDL | 本机 DSDT `WECM` |
