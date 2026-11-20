@@ -125,11 +125,13 @@ async function handleApply() {
       Keyboard.SetLightBrightness(LightBrightness.value),
     ])
 
-    if (colorRes.Success && brightnessRes.Success) {
-      Message.success('键盘灯效设置已应用')
-    } else {
-      const failRes = !colorRes.Success ? colorRes : brightnessRes
-      Message.error(failRes.Message || '应用设置失败')
+    // 颜色与亮度是两条独立通路：本机固件不支持颜色，但背光开关可用。
+    // 分开反馈，避免"颜色失败"把"亮度成功"一起掩盖掉。
+    if (brightnessRes.Success) Message.success(`亮度：${brightnessRes.Message || '已应用'}`)
+    else Message.error(`亮度：${brightnessRes.Message || '设置失败'}`)
+
+    if (!colorRes.Success) {
+      Message.warning(`颜色：${colorRes.Message || '本机不支持'}`, { duration: 4000 })
     }
   } catch {
     Message.error('应用设置异常')
