@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=JiaoLong Control
+Name[zh_CN]=蛟龙控制中心
+GenericName=Laptop Control Center
+GenericName[zh_CN]=笔记本控制中心
+Comment=Performance modes, fan, keyboard backlight and OSD for JiaoLong laptops
+Comment[zh_CN]=蛟龙系列笔记本的性能模式、风扇、键盘背光与屏幕 OSD
+Exec=jiaolongcontrol %U
+Icon=jiaolongcontrol
+Terminal=false
+Categories=System;
+Keywords=cpu;gpu;fan;performance;jiaolong;蛟龙;性能;风扇;
+StartupNotify=true
+StartupWMClass=jiaolong-app

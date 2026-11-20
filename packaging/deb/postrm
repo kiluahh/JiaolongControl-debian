@@ -1,0 +1,18 @@
+#!/bin/sh
+# 卸载后：purge 时清理配置目录、jlc 组成员关系与组本身。
+set -e
+
+if [ "$1" = purge ]; then
+  rm -rf /etc/jlc
+  if getent group jlc >/dev/null; then
+    for u in $(getent group jlc | cut -d: -f4 | tr ',' ' '); do
+      deluser --quiet "$u" jlc >/dev/null 2>&1 || true
+    done
+    delgroup --system --quiet jlc >/dev/null 2>&1 || true
+  fi
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+fi
+
+exit 0

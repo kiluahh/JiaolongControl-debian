@@ -1,0 +1,33 @@
+#!/bin/sh
+# 安装后脚本：创建 jlc 组、把桌面用户加入该组、启用并启动硬件守护进程。
+set -e
+
+if ! getent group jlc >/dev/null; then
+  addgroup --system --quiet jlc
+fi
+
+# 普通用户要通过 /run/jlc.sock（0660 root:jlc）访问守护进程，加入组后重新登录生效
+getent passwd | while IFS=: read -r name _ uid _ _ _ shell; do
+  [ "${uid:-0}" -ge 1000 ] || continue
+  [ "$uid" -lt 60000 ] || continue
+  case "${shell##*/}" in
+    nologin | false) continue ;;
+  esac
+  adduser --quiet "$name" jlc >/dev/null 2>&1 || true
+done
+
+install -d -m 0750 -o root -g jlc /etc/jlc
+
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable jlc-daemon.service >/dev/null 2>&1 || true
+  systemctl restart jlc-daemon.service >/dev/null 2>&1 || true
+  if ! systemctl is-active --quiet jlc-daemon.service; then
+    echo "警告：jlc-daemon 未能启动，硬件控制不可用。查看原因：journalctl -u jlc-daemon -e" >&2
+  fi
+fi
+
+echo "JiaoLong Control 已安装：从应用菜单启动，或运行 jiaolongcontrol"
+echo "提示：首次安装后注销并重新登录，jlc 组权限才会在当前会话生效。"
+
+exit 0

@@ -1,0 +1,20 @@
+[Unit]
+Description=JiaoLong Control hardware daemon (EC/sysfs/NVIDIA)
+Documentation=https://github.com/kiluahh/JiaoLongControl-debian
+After=systemd-modules-load.service local-fs.target
+
+[Service]
+Type=simple
+# acpi_call 提供 /proc/acpi/call（EC 读写）；ryzen_smu 提供 SMU 邮箱（功耗/超频）
+ExecStartPre=-/usr/sbin/modprobe acpi_call
+ExecStartPre=-/usr/sbin/modprobe ryzen_smu
+ExecStart=/usr/bin/env node /opt/jiaolongcontrol/daemon/index.mjs
+Restart=on-failure
+RestartSec=3
+# 只做硬件访问，其余保持默认沙箱
+NoNewPrivileges=no
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
