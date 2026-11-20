@@ -85,17 +85,22 @@ sudo apt install ./jiaolongcontrol_0.1.0_amd64.deb
 
 ## 常见问题
 
-**打开后提示「硬件控制不可用」，数据全是 0？**
+**提示「无法访问 jlc-daemon：当前用户不在 jlc 组」？**
 
-按顺序排查：
+这是权限问题，不是服务没启动。安装时已经把你加入了 `jlc` 组，但它要**新登录会话**才生效：
+注销再重新登录一次即可，也可以临时在当前终端运行 `newgrp jlc`，再从该终端启动面板。
+
+```bash
+groups | grep jlc     # 重新登录后这里应该能看到 jlc
+```
+
+**提示「jlc-daemon 未运行」/ 数据全是 0？**
 
 ```bash
 systemctl status jlc-daemon     # 后台服务是否在跑
-groups | grep jlc               # 当前会话是否已加入 jlc 组（没加就注销重登）
 ls /proc/acpi/call              # acpi_call 是否加载
+journalctl -u jlc-daemon -e     # 看具体报错
 ```
-
-**装完第一次打开没有数据？** 注销重新登录一次，让 `jlc` 组生效。
 
 **风扇页只有「自动 / 全速」？** 正常，见上面的已知限制。
 

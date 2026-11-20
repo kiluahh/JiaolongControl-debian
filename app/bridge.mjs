@@ -38,11 +38,26 @@ export function callDaemon(group, method, args = []) {
       }
     })
     sock.on('error', (e) => {
-      finish({Success: false, Message: `jlc-daemon 未运行（${e.code || e.message}）`})
+      finish({Success: false, Message: describeSocketError(e)})
     })
   })
 }
 
 export function pingDaemon() {
   return callDaemon('Sys', 'Ping')
+}
+
+/** 把 socket 错误翻译成用户能照着做的提示（EACCES 不等于 daemon 没运行） */
+function describeSocketError(e) {
+  const code = e?.code || ''
+  switch (code) {
+    case 'EACCES':
+    case 'EPERM':
+      return '无法访问 jlc-daemon：当前用户不在 jlc 组。请注销并重新登录，或运行 newgrp jlc 后再启动本程序。'
+    case 'ENOENT':
+    case 'ECONNREFUSED':
+      return 'jlc-daemon 未运行，请执行：sudo systemctl start jlc-daemon'
+    default:
+      return `无法连接 jlc-daemon（${code || e?.message || '未知错误'}）`
+  }
 }

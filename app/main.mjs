@@ -178,7 +178,7 @@ app.whenReady().then(async () => {
     if (Notification.isSupported()) {
       new Notification({
         title: 'JiaoLongControl',
-        body: `${ping.Message}\n硬件控制不可用，仅显示监控数据。`,
+        body: ping.Message,
       }).show()
     }
   }
