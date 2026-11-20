@@ -71,37 +71,38 @@ const gpuTempOption = computed(() => getRingOption(props.gpuTemp || 0, '#8A2BE2'
 <template>
   <div class="col-span-7 glass-card p-6 flex flex-col">
     <h2 class="text-[15px] font-medium text-ink/90 mb-2">核心监控</h2>
-    <div class="flex-1 flex justify-around items-center px-4">
+    <!-- 4 个圆环等分剩余宽度并封顶 128px: 窗口变窄时整体缩小, 不再挤破卡片 -->
+    <div class="flex-1 grid grid-cols-4 items-center gap-2 px-2 min-w-0">
       <!-- CPU 使用率 -->
-      <div class="flex flex-col items-center">
-        <div class="w-32 h-32 relative">
+      <div class="flex flex-col items-center min-w-0">
+        <div class="w-full max-w-32 aspect-square relative">
           <VChart :option="cpuUsageOption" autoresize />
         </div>
-        <span class="text-xs text-gray-400 mt-2">CPU 使用率</span>
+        <span class="text-xs text-gray-400 mt-2 text-center">CPU 使用率</span>
       </div>
 
       <!-- GPU 使用率 -->
-      <div class="flex flex-col items-center">
-        <div class="w-32 h-32 relative">
+      <div class="flex flex-col items-center min-w-0">
+        <div class="w-full max-w-32 aspect-square relative">
           <VChart :option="gpuUsageOption" autoresize />
         </div>
-        <span class="text-xs text-gray-400 mt-2">GPU 使用率</span>
+        <span class="text-xs text-gray-400 mt-2 text-center">GPU 使用率</span>
       </div>
 
       <!-- CPU 温度 -->
-      <div class="flex flex-col items-center">
-        <div class="w-32 h-32 relative">
+      <div class="flex flex-col items-center min-w-0">
+        <div class="w-full max-w-32 aspect-square relative">
           <VChart :option="cpuTempOption" autoresize />
         </div>
-        <span class="text-xs text-gray-400 mt-2">CPU 温度</span>
+        <span class="text-xs text-gray-400 mt-2 text-center">CPU 温度</span>
       </div>
 
       <!-- GPU 温度 -->
-      <div class="flex flex-col items-center">
-        <div class="w-32 h-32 relative">
+      <div class="flex flex-col items-center min-w-0">
+        <div class="w-full max-w-32 aspect-square relative">
           <VChart :option="gpuTempOption" autoresize />
         </div>
-        <span class="text-xs text-gray-400 mt-2">GPU 温度</span>
+        <span class="text-xs text-gray-400 mt-2 text-center">GPU 温度</span>
       </div>
     </div>
   </div>

@@ -24,7 +24,7 @@ const mainNavItems = HomeCardType.filter((item) => item.num !== settingsNum)
 
     <div class="flex flex-1 overflow-hidden">
       <!-- 侧边栏 (严格对标图左) -->
-      <aside class="w-[240px] flex flex-col shadow-10 mt-6">
+      <aside class="w-[240px] shrink-0 flex flex-col shadow-10 mt-6">
         <div class="flex-1 h-10 px-4 flex flex-col justify-between overflow-y-auto no-scrollbar">
           <!-- 主导航：这里改用过滤后的 mainNavItems 数组 -->
           <nav class="space-y-1.5">

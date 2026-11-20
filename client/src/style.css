@@ -59,11 +59,14 @@
   .glass-card {
     @apply bg-cyber-card/60 backdrop-blur-3xl border border-ink/[0.04] rounded-[32px];
     box-shadow: 0 20px 50px var(--color-shadow-card);
+    /* 作为 flex/grid 子项时允许收窄, 避免固有内容宽度撑破父容器 */
+    min-width: 0;
   }
 
   /* 页面内容面板卡: 各页卡片的统一底座, 追加类放后面(p-6/space-y-* 等)覆盖 */
   .panel-card {
     @apply bg-panel/60 backdrop-blur-md border border-ink/[0.05] rounded-xl p-5 shadow-lg;
+    min-width: 0;
   }
 
 /* 侧边栏激活项 */

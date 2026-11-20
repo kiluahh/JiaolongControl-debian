@@ -321,9 +321,10 @@ onUnmounted(() => {
 
 <template>
   <div v-if="smuData" class="h-full overflow-y-auto text-ink p-6 no-scrollbar">
-    <div class="max-w-[1300px] mx-auto flex flex-col lg:flex-row gap-6">
+    <!-- 侧栏固定 240px: 内容区实际宽度远小于窗口, 故双栏要到 xl(1280) 才启用 -->
+    <div class="max-w-[1300px] mx-auto flex flex-col xl:flex-row gap-6">
       <!-- ==================== 左/中：高级电源、频率微调区 ==================== -->
-      <div class="flex-1 space-y-6">
+      <div class="flex-1 min-w-0 space-y-6">
         <!-- 头部标题 -->
         <div>
           <h1 class="text-2xl font-bold tracking-wide">Ryzen SMU</h1>
@@ -539,7 +540,7 @@ onUnmounted(() => {
       </div>
 
       <!-- ==================== 右侧：处理器信息与电源遥测栏 ==================== -->
-      <div class="w-full lg:w-[360px] shrink-0 space-y-6 lg:pt-[115px]">
+      <div class="w-full xl:w-[360px] shrink-0 space-y-6 xl:pt-[115px]">
         <!-- 1. AMD Ryzen 处理器芯片详情 -->
         <div
           class="panel-card"
