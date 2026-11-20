@@ -360,9 +360,10 @@ export const methods = {
 
       // 回读只作参考：驱动对 32 个 policy 的更新可能滞后，不一致不应判失败
       await new Promise((r) => setTimeout(r, 60))
+      const targetHz = Math.round(resolved * 1000)
       const stale = policies.filter((p) => {
         const v = readNum(`${base}/${p}/scaling_max_freq`)
-        return v !== null && Math.abs(v - Math.round(resolved * 1000)) > 0 && v !== Math.round(resolved * 1000)
+        return v !== null && v !== targetHz
       })
       const notes = []
       if (writeErrors.length) notes.push(`${writeErrors.length} 个策略写入报错`)
