@@ -71,7 +71,7 @@ sudo ./install.sh
 | logo 灯 | ❌ | 寄存器未确认 |
 | GPU 监控 | ✅ | `nvidia-smi` |
 | GPU 曲线超频 | ❌ | Linux 无 NVAPI VF 曲线接口 |
-| CPU TDP / PBO / CO | ❌ | 需走 SMU（SSDT8 的 `AOD` WMI 或 `ryzen_smu`），未实现 |
+| CPU TDP / EDC / 温度墙 / CO | ✅ | 经 `ryzen_smu` 内核模块写 SMU 邮箱，AM5 命令表已验证（status=1） |
 | 屏幕 OSD 覆盖层 | ❌ | Wayland 不允许应用自定位窗口 |
 | 托盘 | ⚠️ | GNOME 需 AppIndicator 扩展 |
 

@@ -15,6 +15,9 @@ for cmd in node; do
 done
 [[ -e /proc/acpi/call ]] || modprobe acpi_call || echo "警告：acpi_call 未加载"
 
+echo "==> 开机自动加载 ryzen_smu"
+echo ryzen_smu > /etc/modules-load.d/jiaolong.conf
+
 echo "==> 创建 jlc 组"
 getent group jlc >/dev/null || groupadd --system jlc
 

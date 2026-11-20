@@ -5,6 +5,7 @@ After=systemd-modules-load.service
 [Service]
 Type=simple
 ExecStartPre=-/usr/sbin/modprobe acpi_call
+ExecStartPre=-/usr/sbin/modprobe ryzen_smu
 ExecStart=/usr/bin/env node /opt/jiaolong/daemon/index.mjs
 Restart=on-failure
 RestartSec=3

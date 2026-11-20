@@ -252,3 +252,36 @@ Method (PMSC) {
 
 未完成：`APTC`（温度墙，`0x0783` 低 7 位，理论值 0x57/0x5A/0x5F）始终为 0。
 `PMSF` 里这段被 `\_SB.INOU.CSTM == 1` 挡住，调用 `CTAF(1)` 也未能打开——温度墙目前仍由 EC 自管。
+
+## 14. SMU 通路（已打通，2026-11-20）
+
+尝试过两条路，结论明确：
+
+| 路径 | 结果 |
+|---|---|
+| SSDT8 的 `\AOD.WMAA` → `AM05` → SMI 端口 0xB2 | ❌ `acpi_call` 无法正确传 buffer 参数（内核日志：`Insufficient arguments`）；且 `AM05` 自身无轮询逻辑，`OUTB` 恒为 0 |
+| `ryzen_smu` DKMS 模块（PCI 邮箱） | ✅ 加载即识别 `Raphael`，`0x02` 查版本、`0x53`/`0x4F` 写参数均返回 `1` |
+
+模块：`github.com/amkillam/ryzen_smu`，`make dkms-install`，Secure Boot 下由 DKMS MOK 密钥自动签名。
+接口：`smu_args`（6×u32 小端）写参数 → `mp1_smu_cmd`/`rsmu_cmd` 写**二进制命令字节** → 读回 u32LE 状态。
+
+> 踩坑：`mp1_smu_cmd` 按 `sizeof(u8)` 取二进制，写 ASCII 文本会变成完全不同的命令号（`"2"` → `0x32`），
+> 或字节数不符时静默 `return 0`，看起来"命令发出去了但没反应"。
+
+AM5（family 19h model 0x61）命令表，取自上游 `RyzenSmuController`：
+
+| 功能 | MP1 | RSMU |
+|---|---|---|
+| STAPM 限值 / 时间 | 0x4F / 0x53 | — |
+| Fast 限值 | 0x3E | — |
+| Slow 限值 / 时间 | 0x5F / 0x60 | 0xCB |
+| PPT 限值 | — | 0x56 |
+| VRM 电流 | 0x3C | 0x57 |
+| EDC 限值 | 0x3D | 0x58 |
+| 温度墙 | 0x3F | 0x59 |
+| PBO Scalar | — | 0x5B |
+| OC 使能 / 关闭 | — | 0x5D / 0x5E |
+| 全核 CO | 0x36 | 0x07 |
+| 分核 CO | 0x35 | 0x06 |
+
+单位：功耗类参数为**毫瓦**（`watts * 1000`），温度为摄氏度。

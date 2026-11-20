@@ -7,6 +7,7 @@ import {Ec, REG, MODE_BIT, CUME_BIT, FAN_DUTY_MAX, applyPerformanceMode} from '.
 import * as sys from './hw/sysfs.mjs'
 import {nvidia} from './hw/gpu.mjs'
 import {loadConfig, saveConfig} from './hw/config.mjs'
+import * as smu from './hw/smu.mjs'
 
 const ec = new Ec()
 
@@ -135,9 +136,9 @@ export const methods = {
     // AMD 平台没有暴露 core voltage 的 sysfs 节点，EC 侧也未确认对应寄存器
     GetCpuVoltage: () => fail('本机暂不支持 CPU 电压读取'),
     GetPhysicalCoreCount: () => ok(sys.physicalCores()),
-    SetCpuShortPower: () => fail('TDP 需经 SMU，尚未实现'),
-    SetCpuLongPower: () => fail('TDP 需经 SMU，尚未实现'),
-    SetCPUTempWall: () => fail('温度墙需经 SMU，尚未实现'),
+    SetCpuShortPower: (watts) => smuSet('fastLimit', Number(watts) * 1000, `短时功耗 ${watts}W`),
+    SetCpuLongPower: (watts) => smuSet('stapmLimit', Number(watts) * 1000, `长时功耗 ${watts}W`),
+    SetCPUTempWall: (celsius) => smuSet('tempLimit', Number(celsius), `温度墙 ${celsius}℃`),
   },
 
   Fan: {
@@ -344,14 +345,34 @@ export const methods = {
         const temp = ec.tryRead(REG.CPU_TEMP, 0)
         return ok({Ppt: 0, Temp: temp, FreqMhz: sys.cpuFreqMhz(), Usage: sys.cpuUsage()})
       }, 'SMU 遥测'),
-    ...Object.fromEntries(
-      [
-        'SetStapmLimit', 'SetStapmTime', 'SetFastLimit', 'SetSlowLimit', 'SetSlowTime', 'SetPptLimitRsmu',
-        'SetVrmCurrentMp1', 'SetVrmCurrentRsmu', 'SetEdcLimitMp1', 'SetEdcLimitRsmu', 'SetTempLimitMp1',
-        'SetTempLimitRsmu', 'SetPboScalar', 'SetOcClk', 'SetPerCoreOcClk', 'SetOcVolt', 'EnableOc',
-        'DisableOc', 'SetCurveOptimizerAll', 'SetCurveOptimizerPerCore',
-      ].map((name) => [name, () => fail('SMU 写入尚未实现')]),
-    ),
+
+    SetStapmLimit: (watts) => smuSet('stapmLimit', Number(watts) * 1000, `STAPM 限值 ${watts}W`),
+    SetStapmTime: (seconds) => smuSet('stapmTime', Number(seconds), `STAPM 时间 ${seconds}s`),
+    SetFastLimit: (watts) => smuSet('fastLimit', Number(watts) * 1000, `Fast 限值 ${watts}W`),
+    SetSlowLimit: (watts) => smuSet('slowLimit', Number(watts) * 1000, `Slow 限值 ${watts}W`),
+    SetSlowTime: (seconds) => smuSet('slowTime', Number(seconds), `Slow 时间 ${seconds}s`),
+    SetPptLimitRsmu: (watts) => smuSet('pptLimitRsmu', Number(watts) * 1000, `PPT 限值 ${watts}W`),
+    SetVrmCurrentMp1: (ma) => smuSet('vrmCurrent', Number(ma), `VRM 电流 ${ma}mA`),
+    SetVrmCurrentRsmu: (ma) => smuRsmuOnly(0x57, Number(ma), `VRM 电流(R) ${ma}mA`),
+    SetEdcLimitMp1: (ma) => smuSet('edcLimit', Number(ma), `EDC 限值 ${ma}mA`),
+    SetEdcLimitRsmu: (ma) => smuRsmuOnly(0x58, Number(ma), `EDC 限值(R) ${ma}mA`),
+    SetTempLimitMp1: (c) => smuSet('tempLimit', Number(c), `温度墙 ${c}℃`),
+    SetTempLimitRsmu: (c) => smuRsmuOnly(0x59, Number(c), `温度墙(R) ${c}℃`),
+    SetPboScalar: (v) => smuSet('pboScalar', Number(v), `PBO Scalar ${v}`),
+    SetOcClk: (mhz) => smuSet('ocClk', Number(mhz), `OC 频率 ${mhz}MHz`),
+    SetPerCoreOcClk: (idx, mhz) =>
+      smuSet('ocClkPerCore', ((Number(idx) << 8) | (Number(mhz) & 0xff)) >>> 0, `核心 ${idx} OC ${mhz}MHz`),
+    SetOcVolt: (mv) => smuSet('ocVolt', Number(mv), `OC 电压 ${mv}mV`),
+    EnableOc: () => smuSet('ocEnable', 0, 'OC 模式已开启'),
+    DisableOc: () => smuSet('ocDisable', 0, 'OC 模式已关闭'),
+    SetCurveOptimizerAll: (v) => smuSet('curveAll', Number(v) & 0xfffff, `全核 CO ${v}`),
+    SetCurveOptimizerPerCore: (idx, v) => {
+      const core = Number(idx)
+      const val = Number(v)
+      const margin = ((val < 0 ? 0x100000 : 0) + val) & 0xffff
+      const arg = ((Math.floor(core / 8) << 28) | ((core % 8) << 20) | margin) >>> 0
+      return smuSet('curveCore', arg, `核心 ${core} CO ${val}`)
+    },
   },
 
   Osd: {
@@ -368,6 +389,25 @@ export const methods = {
 }
 
 // ── 辅助 ────────────────────────────────────────────────────────────────────
+function smuSet(key, arg, label) {
+  try {
+    const c = smu.CMD[key]
+    smu.sendAny(c.mp1, c.rsmu, arg)
+    return ok(undefined, `${label} 已写入`)
+  } catch (e) {
+    return fail(e.message)
+  }
+}
+
+function smuRsmuOnly(cmd, arg, label) {
+  try {
+    smu.send('rsmu', cmd, arg)
+    return ok(undefined, `${label} 已写入`)
+  } catch (e) {
+    return fail(e.message)
+  }
+}
+
 function gpuField(key, dflt) {
   const g = nvidia()
   return g ? ok(g[key] ?? dflt) : fail('nvidia-smi 不可用')
