@@ -20,3 +20,4 @@ probe/watch.json
 probe/ec-diff.json
 probe/mode-set.json
 probe/rgb-test.json
+probe/aod.json
