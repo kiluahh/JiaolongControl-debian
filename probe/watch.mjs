@@ -18,16 +18,19 @@ const arg = (n, d) => {
 }
 const SECONDS = Number(arg('seconds', '30'))
 const HZ = Number(arg('hz', '5'))
+const ADDRS = arg('addrs', null)
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(ROOT, 'probe', 'watch.json')
 const CALL = '/proc/acpi/call'
 
 /** 候选：模式/风扇/键盘/功耗相关 */
-const WATCH = [
-  0x0726, 0x0727, 0x0740, 0x0741, 0x0743, 0x074e, 0x0751, 0x0765, 0x0766, 0x0767,
-  0x078c, 0x078e, 0x1804, 0x1809, 0x043e, 0x044f, 0x0464, 0x0465, 0x046c, 0x046d,
-]
+const WATCH = ADDRS
+  ? ADDRS.split(',').map((s) => Number(s.trim().startsWith('0x') ? s.trim() : '0x' + s.trim()))
+  : [
+      0x0726, 0x0727, 0x0740, 0x0741, 0x0743, 0x074e, 0x0751, 0x0765, 0x0766, 0x0767,
+      0x078c, 0x078e, 0x1804, 0x1809, 0x043e, 0x044f, 0x0464, 0x0465, 0x046c, 0x046d,
+    ]
 
 function read(addr) {
   fs.writeFileSync(CALL, `\\_SB.INOU.ECRR 0x${addr.toString(16)}`)
