@@ -77,9 +77,11 @@ args.writeUInt32LE(arg >>> 0, 0)
 
 try {
   fs.writeFileSync(path.join(DIR, 'smu_args'), args)
-  fs.writeFileSync(path.join(DIR, 'mp1_smu_cmd'), String(cmd))
-  const statusRaw = fs.readFileSync(path.join(DIR, 'mp1_smu_cmd'), 'utf8').trim()
-  const status = Number(statusRaw)
+  // 驱动按 sizeof(u8)/sizeof(u32) 取二进制值，必须写 Buffer 而不是文本
+  fs.writeFileSync(path.join(DIR, 'mp1_smu_cmd'), Buffer.from([cmd & 0xff]))
+  const rspBuf = fs.readFileSync(path.join(DIR, 'mp1_smu_cmd'))
+  const status = rspBuf.length >= 4 ? rspBuf.readUInt32LE(0) : (rspBuf[0] ?? null)
+  const statusRaw = status === null ? '(空)' : String(status)
   report.cmd = {cmd, arg}
   report.result = {statusRaw, status, meaning: STATUS[status] ?? '未知'}
 
