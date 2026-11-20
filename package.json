@@ -1,6 +1,6 @@
 {
   "name": "jiaolongcontrol-debian",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "蛟龙 16 Pro 控制中心的 Debian/Linux 移植",

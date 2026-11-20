@@ -31,7 +31,7 @@ ls /proc/acpi/call                        # 存在说明 acpi_call 可用
 从 [Releases](https://github.com/kiluahh/JiaolongControl-debian/releases) 下载 `.deb`，然后：
 
 ```bash
-sudo apt install ./jiaolongcontrol_0.1.0_amd64.deb
+sudo apt install ./jiaolongcontrol_0.1.1_amd64.deb
 ```
 
 安装脚本会自动：安装依赖、创建 `jlc` 组并把当前桌面用户加进去、启用并启动后台硬件服务 `jlc-daemon`。
