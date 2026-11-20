@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {callDaemon, pingDaemon} from './bridge.mjs'
+import {handleShellCall} from './shellCalls.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -94,6 +95,11 @@ function buildTray() {
 }
 
 ipcMain.handle('jlc:call', async (_e, {group, method, args}) => {
+  // 先看是否该由外壳以用户身份处理（打开链接、音量…），否则转发给 root daemon
+  const local = await handleShellCall(group, method, args, {
+    openExternal: (url) => shell.openExternal(url),
+  })
+  if (local) return local
   const res = await callDaemon(group, method, args)
   return res
 })
