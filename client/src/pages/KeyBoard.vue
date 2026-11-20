@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import {Keyboard, KeyboardGradient} from '@/utils/bridge.ts'
 import EditableValue from '@/components/common/EditableValue.vue'
@@ -16,6 +16,13 @@ async function syncGradientState() {
 
 const color = ref({ red: 0, green: 0, blue: 0 })
 const LightBrightness = ref(0)
+/** 本机固件只有电源位：把 0..3 收成开关，避免给出并不存在的四档 */
+const lightOn = computed({
+  get: () => LightBrightness.value > 0,
+  set: (v: boolean) => {
+    LightBrightness.value = v ? 3 : 0
+  },
+})
 const colorPicker = ref('#8A2BE2')
 
 // 快捷配色预设
@@ -329,22 +336,16 @@ function handleReset() {
               <a-slider v-model="color.blue" :min="0" :max="255" :disabled="gradientRunning" class="w-full blue-slider" />
             </div>
 
-            <!-- 背光亮度 -->
+            <!-- 背光开关（本机只暴露电源位） -->
             <div class="space-y-2 pt-2 border-t border-ink/[0.05]">
               <div class="flex justify-between items-center text-xs">
-                <span class="text-gray-300 flex items-center gap-1">背光亮度等级</span>
-                <span class="text-purple-400 font-medium font-mono"
-                  >Level
-                  <EditableValue
-                    v-model="LightBrightness"
-                    :disabled="gradientRunning"
-                    :max="3"
-                    :min="0"
-                    :step="1"
-                    class="text-purple-400 font-medium font-mono"
-                /></span>
+                <span class="text-gray-300 flex items-center gap-1">背光开关</span>
+                <a-switch v-model="lightOn" :disabled="gradientRunning" />
               </div>
-              <a-slider v-model="LightBrightness" :min="0" :max="3" :step="1" :disabled="gradientRunning" class="w-full" />
+              <p class="text-[11px] leading-relaxed text-gray-500">
+                本机 EC 只暴露电源位，亮度仅支持开 / 关；<br />
+                明暗分级与 RGB 颜色由厂商私有 EC 命令控制，当前无法访问。
+              </p>
             </div>
           </div>
         </div>
@@ -398,10 +399,10 @@ function handleReset() {
             </div>
           </div>
           <div class="flex justify-between items-center text-xs text-gray-400">
-            <span>当前亮度级别</span>
-            <span class="text-ink font-mono font-bold bg-ink/10 px-2 py-0.5 rounded"
-              >档位 {{ LightBrightness }}</span
-            >
+            <span>背光状态</span>
+            <span class="text-ink font-mono font-bold bg-ink/10 px-2 py-0.5 rounded">{{
+              LightBrightness > 0 ? '开' : '关'
+            }}</span>
           </div>
         </div>
 
