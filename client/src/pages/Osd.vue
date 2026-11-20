@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {computed, onMounted, ref} from 'vue'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import SettingToggle from '@/components/common/SettingToggle.vue'
 import EditableValue from '@/components/common/EditableValue.vue'
@@ -119,13 +119,34 @@ async function refreshVolume() {
   }
 }
 
-async function onVolumeChange(val: number | [number, number]) {
+// 拖动时 Arco 每次移动都会触发 change。这里做 120ms 节流：拖动过程中音量跟着变
+// （最多每秒 10 次 wpctl），又不会"每像素一次"；成功后不回写滑条值，避免
+// 异步回读把滑条拽回旧值——那正是"先回弹、再慢慢滑到终点"的原因。
+const VOLUME_MIN_INTERVAL_MS = 120
+let volumeTimer: ReturnType<typeof setTimeout> | null = null
+let pendingVolume = 0
+let lastAppliedAt = 0
+
+function onVolumeChange(val: number | [number, number]) {
   if (typeof val !== 'number') return
+  pendingVolume = val
+  if (volumeTimer) clearTimeout(volumeTimer)
+  const wait = Math.max(0, VOLUME_MIN_INTERVAL_MS - (Date.now() - lastAppliedAt))
+  volumeTimer = setTimeout(() => {
+    volumeTimer = null
+    lastAppliedAt = Date.now()
+    void applyVolume(pendingVolume)
+  }, wait)
+}
+
+async function applyVolume(val: number) {
   try {
     const res = await Osd.SetVolume(val)
-    if (!res.Success) Message.error(res.Message)
-    // 回读实际值，避免滑条与系统真实音量脱节（如设备切换后）
-    await refreshVolume()
+    // 成功时不回写 volume：滑条已经停在用户放下的位置，回写只会和手抢位置
+    if (!res.Success) {
+      Message.error(res.Message)
+      await refreshVolume()
+    }
   } catch {
     Message.error('设置音量失败')
   }
@@ -164,6 +185,11 @@ const previewItems = [
 
 onMounted(() => {
   refreshVolume()
+})
+
+onUnmounted(() => {
+  if (volumeTimer) clearTimeout(volumeTimer)
+  volumeTimer = null
 })
 </script>
 

@@ -95,22 +95,34 @@
   height: 5px !important;
   border-radius: 99px;
 }
+
+/* 轨道命中区：Arco 原本给 12px，之前被压成 5px，鼠标必须精确落在细线上才跳转。
+ * 现在命中区放大到 20px，视觉上的细轨改由 ::before 画，外观不变。 */
 .arco-slider-track {
+  height: 20px !important;
+  background: transparent !important;
+}
+.arco-slider-track::before {
   height: 5px !important;
-  border-radius: 99px;
+  border-radius: 99px !important;
 }
 /* 深色下的轨道底色; 浅色使用 Arco 原生浅色轨道。
  * 同时写 :not 与显式 dark 两种选择器, 确保任意 data-theme 状态下深色规则都命中 */
-html:not([data-theme='light']) .arco-slider-track,
-html[data-theme='dark'] .arco-slider-track {
+html:not([data-theme='light']) .arco-slider-track::before,
+html[data-theme='dark'] .arco-slider-track::before {
   background-color: rgba(255, 255, 255, 0.04) !important;
 }
-.arco-slider-button {
-  background-color: #ffffff !important;
-  border: 2.5px solid var(--color-accent-purple) !important;
-  width: 13px !important;
-  height: 13px !important;
-  box-shadow: 0 0 10px rgba(138, 43, 226, 0.7) !important;
+
+/* 手柄：Arco 真实类名是 .arco-slider-btn（此前误写成 .arco-slider-button，
+ * 该规则从未生效）。这里只放大命中框到 18px，圆点仍保持 12px 居中。 */
+.arco-slider-btn {
+  top: 50% !important;
+  width: 18px !important;
+  height: 18px !important;
+  transform: translate(-50%, -50%) !important;
+}
+.arco-slider-btn::after {
+  inset: 3px !important;
 }
 
 /* ===== Arco Modal 全局主题化: 弹窗传送(render-to-body)至 document.body, 页面 scoped
