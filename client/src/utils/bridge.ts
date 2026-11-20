@@ -127,8 +127,11 @@ export interface BridgeApi {
   }
   Fan: {
     GetFanSpeed(): HostBridgePromise<FanSpeedInfo>
+    /** 本机 EC 不支持按转速调速，调用会返回失败（见 daemon/methods.mjs 注释） */
     SetFanSpeed(fanSpeed: number): HostBridgePromise<void>
     RemoveFanSpeed(): HostBridgePromise<void>
+    GetMaxFanSpeedSwitch(): HostBridgePromise<boolean>
+    SetMaxFanSpeedSwitch(on: boolean): HostBridgePromise<void>
   }
   GPU: {
     Get(): HostBridgePromise<GPUMode>
@@ -327,6 +330,8 @@ export const Fan = {
   SetFanSpeed: (fanSpeed: number) =>
     call(raw.Fan.SetFanSpeed(Math.max(0, Math.min(255, Math.round(fanSpeed / 100))))),
   RemoveFanSpeed: () => call(raw.Fan.RemoveFanSpeed()),
+  GetMaxFanSpeedSwitch: () => call<boolean>(raw.Fan.GetMaxFanSpeedSwitch()),
+  SetMaxFanSpeedSwitch: (on: boolean) => call(raw.Fan.SetMaxFanSpeedSwitch(on)),
 }
 
 export const GPU = {

@@ -1,174 +1,116 @@
 <script setup lang="ts">
-import {computed, ref} from 'vue'
+import {onMounted, ref} from 'vue'
 import {Message} from '@arco-design/web-vue'
 import {Fan} from '@/utils/bridge'
 import {stopAutoFanIfRunning} from '@/utils/fanControl'
-import {useConfigStore} from '@/stores/config'
 import FanSpeed from '@/components/common/FanSpeed.vue'
-import EditableValue from '@/components/common/EditableValue.vue'
-import {FAN_MAX_RPM, FAN_MIN_RPM} from '@/constants'
 
 const loading = ref(false)
-const visible = ref(false)
-const configStore = useConfigStore()
+const fullFan = ref(false)
 
-const FanPageStore = computed(() => configStore.config?.Fan)
-
-const handleClick = () => {
-  if (!FanPageStore.value) return
-  if (FanPageStore.value.ManualFanSpeed > FAN_MAX_RPM || FanPageStore.value.ManualFanSpeed < FAN_MIN_RPM) {
-    visible.value = true
-  } else {
-    handleOk()
+/**
+ * 本机风扇只有「自动」和「全速」两档（2026-11-20 实测，见 probe/fan-table.mjs）：
+ *   0x1804/0x1809 占空比 10..200 → 转速恒 ～5630 RPM，不随值变化
+ *   0x0f20/0x0f50 风扇表 + 使能位 → 转速恒 ～3348 RPM，表没被读
+ *   唯一有效的是 0x0751 bit6（full fan mode）
+ * 所以这里不给滑条，只给开关——不做看起来能调、其实调不动的控件。
+ */
+async function refresh() {
+  try {
+    const res = await Fan.GetMaxFanSpeedSwitch()
+    if (res.Success) fullFan.value = !!res.Data
+  } catch {
+    /* 读不到就保持当前显示 */
   }
 }
 
-const handleOk = async () => {
-  if (!FanPageStore.value) return
-  visible.value = false
+async function handleToggle(value: string | number | boolean) {
+  const want = !!value
   loading.value = true
   try {
+    // 全速开关与自动风扇控制环互斥：先停控制环，避免它把状态写回去
     await stopAutoFanIfRunning()
-    const res = await Fan.SetFanSpeed(FanPageStore.value.ManualFanSpeed)
-    if (res.Success) {
-      Message.success(res.Message)
-      configStore.debouncedSave()
-    } else {
-      Message.error(res.Message)
-    }
-  } catch {
-    Message.error('应用失败，请检查桥接服务')
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleCancel = () => {
-  visible.value = false
-}
-
-async function handleRemoveFanClick() {
-  try {
-    await stopAutoFanIfRunning()
-    const res = await Fan.RemoveFanSpeed()
+    const res = await Fan.SetMaxFanSpeedSwitch(want)
     if (res.Success) {
       Message.success(res.Message)
     } else {
-      Message.error(res.Message)
+      Message.error(res.Message || '切换失败')
+      fullFan.value = !want
     }
   } catch {
     Message.error('操作失败，请检查桥接服务')
+    fullFan.value = !want
+  } finally {
+    loading.value = false
+    await refresh()
   }
 }
+
+onMounted(refresh)
 </script>
 
 <template>
-  <div v-if="FanPageStore" class="h-full overflow-y-auto text-ink p-6 no-scrollbar">
+  <div class="h-full overflow-y-auto text-ink p-6 no-scrollbar">
     <div class="max-w-[1300px] mx-auto flex flex-col lg:flex-row gap-6">
-      <!-- ==================== 左侧：手动风扇控制区 ==================== -->
+      <!-- ==================== 左侧：风扇模式 ==================== -->
       <div class="flex-1 space-y-6">
-        <!-- 头部标题 -->
         <div>
           <h1 class="text-2xl font-bold tracking-wide">风扇控制</h1>
-          <p class="text-[13px] text-gray-500 mt-1">手动调节风扇转速或恢复自动控制</p>
+          <p class="text-[13px] text-gray-500 mt-1">
+            本机 EC 只提供「自动」与「全速」两档，不支持按转速调节
+          </p>
         </div>
 
-        <!-- 转速调节磨砂卡片 -->
-        <div
-          class="panel-card p-6"
-        >
+        <div class="panel-card p-6">
           <div class="flex flex-col gap-6">
-            <div class="flex justify-between items-end">
+            <div class="flex justify-between items-center">
               <div>
                 <span class="text-[10px] font-bold text-purple-400 uppercase tracking-widest block"
-                  >Manual Control</span
+                  >Fan Mode</span
                 >
-                <h2 class="text-base font-semibold mt-1 text-gray-200">目标转速设定</h2>
+                <h2 class="text-base font-semibold mt-1 text-gray-200">
+                  {{ fullFan ? '全速（EC 不再自动调速）' : '自动（EC 固件曲线）' }}
+                </h2>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  自动模式随性能档（平衡/性能/安静）由 EC 固件调节转速；全速模式把两个风扇钉在最高转速。
+                </p>
               </div>
-              <div class="text-right">
-                <EditableValue
-                  v-model="FanPageStore.ManualFanSpeed"
-                  :max="8000"
-                  :min="0"
-                  :step="100"
-                  class="text-3xl font-black font-mono text-ink leading-none"
-                />
-                <span class="text-gray-500 text-xs ml-1 font-bold font-mono">RPM</span>
-              </div>
+              <a-switch
+                :model-value="fullFan"
+                :loading="loading"
+                size="medium"
+                @change="handleToggle"
+              />
             </div>
 
-            <!-- 自定义发光滑块 -->
-            <a-slider
-              v-model="FanPageStore.ManualFanSpeed"
-              :min="0"
-              :max="8000"
-              :step="100"
-              class="w-full"
-            />
-
-            <!-- 动作按钮组 -->
-            <div class="grid grid-cols-2 gap-4 mt-2">
-              <button
-                :disabled="loading"
-                class="text-xs font-semibold text-white bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 disabled:opacity-50 py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(138,43,226,0.3)]"
-                @click="handleClick"
-              >
-                {{ loading ? '应用中...' : '应用设定' }}
-              </button>
-              <button
-                class="text-xs font-semibold text-gray-300 hover:text-ink border border-ink/10 hover:border-ink/20 bg-ink/[0.02] hover:bg-ink/[0.05] py-2.5 rounded-lg transition-all"
-                @click="handleRemoveFanClick"
-              >
-                移除限制
-              </button>
+            <div class="text-[11px] text-gray-500 leading-relaxed border-t border-ink/[0.06] pt-4 space-y-2">
+              <p>
+                <strong class="text-gray-400">为什么没有转速滑条</strong>：本机 EC 不接受按转速写入。
+                实测 `0x1804/0x1809` 占空比 10–200、`0x0f20/0x0f50` 自定义风扇表、以及驱动里的
+                old-path 时序，转速都恒定不变（分别是 ～5630 / ～3348 / ～5620 RPM），
+                只有 `0x0751` bit6 的「全速」位真正生效。
+              </p>
+              <p>证据：<code class="text-gray-400">probe/fan-table.mjs</code> 与 <code class="text-gray-400">probe/fan-table.json</code>。</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ==================== 右侧：实时监控与安全提醒栏 ==================== -->
+      <!-- ==================== 右侧：实时监控 ==================== -->
       <div class="w-full lg:w-[360px] shrink-0 space-y-6 lg:pt-[115px]">
-        <!-- 1. 实时状态监控（原先直接跟在下方的监控改到右侧排版） -->
         <FanSpeed />
 
-        <!-- 2. 安全说明卡片 -->
-        <div
-          class="panel-card space-y-2.5 select-none"
-        >
+        <div class="panel-card space-y-2.5 select-none">
           <h2 class="text-[13px] font-semibold text-gray-300">安全提示</h2>
           <div class="text-[11px] text-gray-500 leading-relaxed space-y-2">
-            <p><strong>手动设定</strong>: 会关闭自动风扇温控后台，使转速锁定在您调整的设定值上。</p>
+            <p><strong>全速模式</strong>：两个风扇会持续运行在最高转速，噪音明显增大，适合压测、渲染或清灰后短时使用。</p>
+            <p><strong>切回自动</strong>：关闭开关即可交回 EC 固件调速，转速会按温度与性能档自然回落。</p>
             <p>
-              <strong>高转速磨损</strong>: 长时间处于超过 5800 RPM
-              极高转速可能会缩短电机寿命并产生刺耳噪音。
-            </p>
-            <p>
-              <strong>低转速降频</strong>:
-              重载时转速过低会导致处理器和图形芯片因过热而发生降频物理限速。
+              <strong>高温保护</strong>：自动模式下请不要长时间阻塞进出风口；温度墙由 Ryzen SMU 与 EC 双重保护。
             </p>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- 安全警告暗色模态窗口 -->
-    <a-modal
-      v-model:visible="visible"
-      simple
-      :mask-closable="false"
-      @ok="handleOk"
-      @cancel="handleCancel"
-    >
-      <template #title>安全警告</template>
-      <div class="text-[12px] text-gray-300 leading-relaxed">
-        设定目标转速高于 <span class="text-rose-400 font-bold font-mono">5800 RPM</span> 或低于
-        <span class="text-rose-400 font-bold font-mono">1500 RPM</span
-        >，可能会引起系统噪音剧增、硬件热量积攒异常。请确认您在清楚此操作后果的前提下继续。
-      </div>
-    </a-modal>
-  </div>
-
-  <div v-else class="flex items-center justify-center h-full">
-    <a-spin dot />
   </div>
 </template>

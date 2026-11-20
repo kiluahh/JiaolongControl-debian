@@ -122,7 +122,9 @@ export const REG = {
 export const MODE_BIT = {
   TBME: 0x10, // 性能档（Turbo Mode Enable）
   UFME: 0x80, // 安静档（User Fan Mode Enable）
-  MANUAL_FAN: 0x40, // 手动风扇（uniwill full fan mode）
+  // 0x40 = full fan mode（全速），不是「手动占空比」：置位后两个风扇都被钉在最高转速，
+  // TUXEDO uniwill_keyboard.h 的 set_full_fan_mode() 写的正是这一位。
+  FULL_FAN: 0x40,
 }
 
 /** 0x0727 bit6 = CUME，官方控制中心的"自定义/白灯"档 */

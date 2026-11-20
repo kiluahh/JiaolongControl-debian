@@ -60,7 +60,7 @@ const autoFan = {
     this.running = false
     if (this.timer) clearInterval(this.timer)
     this.timer = null
-    ecGuard(() => ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, false), '停止自动风扇')
+    ecGuard(() => ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, false), '停止自动风扇')
   },
   tick() {
     if (!ec.available) return
@@ -72,7 +72,7 @@ const autoFan = {
     const duty = rpmToDuty(rpm)
     ec.writeByte(REG.DUTY_CPU, duty)
     if (cfg.Fan?.FanCurveMerge) ec.writeByte(REG.DUTY_GPU, duty)
-    ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, true)
+    ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, true)
   },
 }
 
@@ -125,23 +125,30 @@ export const methods = {
         // 注意：上游 FanController 把 item2 映射为 CPU、item1 为 GPU，此处直接按本机布局返回
         return ok({CPUFanSpeed: cpu, GPUFanSpeed: gpu})
       }, '风扇转速'),
-    // 前端传的是目标转速 RPM（Fan.vue 滑条 0..8000）
-    SetFanSpeed: (rpm) =>
+    // 本机实测（probe/fan-table.mjs，2026-11-20）：
+    //   0x1804/0x1809 占空比 10..200  → 转速恒 ～5630 RPM（不随值变化）
+    //   0x0f20/0x0f50 风扇表 + 使能位 → 转速恒 ～3348 RPM（表根本没被读）
+    //   驱动 old-path（bit6 清零→置位→连写 10 次）→ 20 和 200 都是 ～5620
+    // 唯一真实可控的是 0x0751 bit6 = full fan mode，所以这里不再假装能按 RPM 调。
+    SetFanSpeed: () =>
+      fail(
+        '本机 EC 只支持「自动」和「全速」两档：按转速调速实测无效（0x1804 占空比与 0x0f20 风扇表都不改变转速），请用 SetMaxFanSpeedSwitch',
+      ),
+    // 全速风扇开关（0x0751 bit6）
+    SetMaxFanSpeedSwitch: (on) =>
       ecGuard(() => {
-        const duty = rpmToDuty(Number(rpm) || 0)
-        ec.writeByte(REG.DUTY_CPU, duty)
-        ec.writeByte(REG.DUTY_GPU, duty)
-        ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, true)
-        return ok({Rpm: Number(rpm) || 0, Duty: duty}, `已设为 ${Number(rpm) || 0} RPM（占空比 ${duty}/${FAN_DUTY_MAX}）`)
-      }, '设置风扇'),
+        const want = !!on
+        ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, want)
+        const is = !!(ec.readByte(REG.MODE) & MODE_BIT.FULL_FAN)
+        if (is !== want) return fail(`写入未生效（回读 0x0751=0x${ec.readByte(REG.MODE).toString(16)}）`)
+        return ok(undefined, want ? '已开启全速风扇（EC 自动调速已关闭）' : '已恢复 EC 自动调速')
+      }, '全速风扇'),
+    GetMaxFanSpeedSwitch: () => ecGuard(() => ok(!!(ec.readByte(REG.MODE) & MODE_BIT.FULL_FAN)), '风扇状态'),
     RemoveFanSpeed: () =>
       ecGuard(() => {
-        ec.updateBit(REG.MODE, MODE_BIT.MANUAL_FAN, false)
+        ec.updateBit(REG.MODE, MODE_BIT.FULL_FAN, false)
         return ok(undefined, '已交回 EC 自动控制')
       }, '恢复风扇'),
-    // 前端未直接调用，但 Windows 版有：全速开关
-    GetMaxFanSpeedSwitch: () =>
-      ecGuard(() => ok(!!(ec.readByte(REG.FAN_CTRL_STATUS) & 0x40)), '风扇能力'),
   },
 
   PerformanceMode: {
@@ -162,7 +169,7 @@ export const methods = {
         const cume = ec.readByte(REG.CUME)
         // 切档时退出自定义档与手动风扇，保留 EC 维护的其它位
         ec.writeByte(REG.CUME, cume & ~CUME_BIT)
-        const base = cur & ~(MODE_BIT.TBME | MODE_BIT.UFME | MODE_BIT.MANUAL_FAN)
+        const base = cur & ~(MODE_BIT.TBME | MODE_BIT.UFME | MODE_BIT.FULL_FAN)
         const next = m === 1 ? base | MODE_BIT.TBME : m === 2 ? base | MODE_BIT.UFME : base
         ec.writeByte(REG.MODE, next)
         const readBack = ec.readByte(REG.MODE)
@@ -256,9 +263,12 @@ export const methods = {
   },
 
   AutoFan: {
-    Start: () => {
+    // 本机没有可用的「按转速」写入通路（见 Fan.SetFanSpeed 的说明），
+    // 控制环跑起来只会把 full-fan 位置上 → 风扇恒满速，所以直接拒绝启动。
+    Start: () => fail('本机 EC 不支持按转速调速，自动风扇曲线无法落地；请用「全速风扇」开关'),
+    StartLegacy: () => {
       autoFan.start()
-      return ok(undefined, '自动风扇已启动')
+      return ok(undefined, '自动风扇已启动（本机无效）')
     },
     Stop: () => {
       autoFan.stop()
