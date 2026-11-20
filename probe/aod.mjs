@@ -22,7 +22,7 @@ const CMD = argOf('cmd')
 const ROOT = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(ROOT, 'probe', 'aod.json')
 const CALL = '/proc/acpi/call'
-const WMAA = '\\_SB.AOD.WMAA'
+const WMAA = '\\AOD.WMAA'
 
 const hex = (n) => '0x' + n.toString(16)
 
