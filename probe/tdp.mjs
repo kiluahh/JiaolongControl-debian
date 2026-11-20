@@ -232,6 +232,48 @@ function save(data) {
   log(`\n证据: ${OUT}`)
 }
 
+// ── 恢复现场 ────────────────────────────────────────────────────────────────
+/**
+ * 恢复所需的状态放在模块作用域，由 cleanup() 统一收尾：
+ * 原来用 process.exit() 结束，而 process.exit() 直接终止进程、**不会执行 finally**，
+ * 于是"临时抬高的频率上限"和"测试用的 SMU 限值"都留在了机器上（实测踩到过一次）。
+ * 现在改成设置 process.exitCode 后 return，让 finally 正常跑；
+ * 再额外接管 SIGINT/SIGTERM，按 Ctrl-C 也一定恢复。
+ */
+const state = {stopLoad: null, capBefore: 0, freqRaised: false, limitsTouched: false, restore: null, done: false}
+
+function cleanup() {
+  if (state.done) return
+  state.done = true
+  if (state.stopLoad) {
+    try {
+      state.stopLoad()
+    } catch {
+      /* 压测进程可能已经退出 */
+    }
+    state.stopLoad = null
+  }
+  if (state.freqRaised) {
+    const r = setMaxFreqAll(state.capBefore)
+    const bad = r.filter((x) => !x.ok)
+    log(`[restore] 频率上限已恢复为 ${state.capBefore} kHz${bad.length ? `（${bad.length} 个失败）` : ''}`)
+  }
+  if (state.limitsTouched && state.restore) {
+    const restored = setLongShort(state.restore.long, state.restore.short)
+    const bad = restored.filter((r) => !r.ok)
+    log(`\n[restore] 已恢复限值 长 ${state.restore.long}W / 短 ${state.restore.short}W（来源: ${state.restore.source}）`)
+    if (bad.length) log(`[restore] 部分失败: ${bad.map((r) => `${r.key}: ${r.message}`).join('; ')}`)
+  }
+}
+
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    log(`\n收到 ${sig}，先恢复现场再退出`)
+    cleanup()
+    process.exit(130)
+  })
+}
+
 async function main() {
   if (process.getuid?.() !== 0) {
     console.error('需要 root（RAPL energy_uj 与 SMU 都要 root）：sudo node probe/tdp.mjs')
@@ -258,8 +300,9 @@ async function main() {
   log(`频率上限: scaling_max_freq=${cap0.cur} kHz / cpuinfo_max_freq=${cap0.hw} kHz`)
   const cappedLow = cap0.cur > 0 && cap0.hw > 0 && cap0.cur < cap0.hw * 0.95
   if (cappedLow) {
-    log(`   ⚠ CPU 被限频在 ${(cap0.cur / 1e6).toFixed(2)} GHz，SMU 限值不会成为瓶颈`)
-    log(`     本次测试临时抬到硬件上限 ${(cap0.hw / 1e6).toFixed(2)} GHz，结束恢复`)
+    log(`   ⚠ CPU 上限 ${(cap0.cur / 1e6).toFixed(2)} GHz 低于硬件 ${(cap0.hw / 1e6).toFixed(2)} GHz：`)
+    log('     高限值阶段的功耗可能被频率上限先压住，测不出真实差值')
+    log(`     本次临时抬到硬件上限 ${(cap0.hw / 1e6).toFixed(2)} GHz，结束恢复`)
   }
   log('')
 
@@ -268,34 +311,40 @@ async function main() {
   result.freqCapBefore = cap0
   const restore = restoreValues()
   result.restore = restore
-  let stopLoad = null
-  let touched = false
-  let raisedFreqCap = false
+  state.capBefore = cap0.cur
+  state.restore = restore
   try {
     if (cappedLow) {
       const r = setMaxFreqAll(cap0.hw)
       const bad = r.filter((x) => !x.ok)
-      raisedFreqCap = bad.length === 0
+      state.freqRaised = bad.length === 0
       log(`[freq] 已把 ${r.length} 个 policy 的上限抬到 ${cap0.hw} kHz${bad.length ? `（${bad.length} 个失败）` : ''}`)
     }
     // ── 空载基线 ──
+    // 刚跑完压测/刚抬过频率时测一次会明显偏高（实测 57W vs 稳态 26W），
+    // 所以取 3 个 1 秒窗口的最小值，代表真正的空闲底噪。
     log('== 空载基线 ==')
     sampler.sample() // 建立基线
     await sleep(IDLE_MS)
-    const idle = sampler.sample()
+    let idle = null
+    for (let i = 0; i < 3; i++) {
+      const w = sampler.sample()
+      if (w !== null && (idle === null || w < idle)) idle = w
+      await sleep(1000)
+    }
     result.idleWatts = idle
-    log(`   整包功耗 ${idle ?? '?'} W`)
+    log(`   整包功耗 ${idle ?? '?'} W（取 3 秒窗口最小值；当前 CPU 占用 ${cpuUsage() ?? '?'}%）`)
 
     // ── 低限值 ──
     log(`\n== 阶段 1：限值 ${LOW}W ==`)
     const lowSet = setTdp(LOW)
-    touched = true
+    state.limitsTouched = true
     for (const r of lowSet) log(`   ${r.key} → ${r.ok ? 'OK' : '失败: ' + r.message}`)
-    stopLoad = startLoad()
+    state.stopLoad = startLoad()
     log(`   已启动 ${os.cpus().length} 个压测进程，预热中…`)
     await sleep(WARMUP_MS)
-    const low = await samplePhase(sampler, stopLoad)
-    stopLoad = null
+    const low = await samplePhase(sampler, state.stopLoad)
+    state.stopLoad = null
     log(
       `   实测 ${low.wattsAvg} W（峰值 ${low.wattsMax}）  ${low.freqAvgMhz} MHz  ${low.tempAvgC} ℃  CPU ${low.usageAvgPct}%  [${low.samples} 样本]`,
     )
@@ -307,11 +356,11 @@ async function main() {
     log(`\n== 阶段 2：限值 ${HIGH}W ==`)
     const highSet = setTdp(HIGH)
     for (const r of highSet) log(`   ${r.key} → ${r.ok ? 'OK' : '失败: ' + r.message}`)
-    stopLoad = startLoad()
+    state.stopLoad = startLoad()
     log('   已启动压测，预热中…')
     await sleep(WARMUP_MS)
-    const high = await samplePhase(sampler, stopLoad)
-    stopLoad = null
+    const high = await samplePhase(sampler, state.stopLoad)
+    state.stopLoad = null
     log(
       `   实测 ${high.wattsAvg} W（峰值 ${high.wattsMax}）  ${high.freqAvgMhz} MHz  ${high.tempAvgC} ℃  CPU ${high.usageAvgPct}%  [${high.samples} 样本]`,
     )
@@ -320,7 +369,7 @@ async function main() {
     // ── 判定 ──
     log('\n== 对比 ==')
     const rows = [
-      ['空载', null, null, null],
+      ['空载', idle, null, null],
       [`${LOW}W 设定`, low.wattsAvg, low.freqAvgMhz, low.tempAvgC],
       [`${HIGH}W 设定`, high.wattsAvg, high.freqAvgMhz, high.tempAvgC],
     ]
@@ -329,7 +378,8 @@ async function main() {
       log(`   ${String(label).padEnd(10)}  ${String(w ?? '-').padStart(6)}   ${String(f ?? '-').padStart(6)}   ${t ?? '-'}`)
     }
 
-    const delta = low.wattsAvg !== null && high.wattsAvg !== null ? high.wattsAvg - low.wattsAvg : null
+    const rawDelta = low.wattsAvg !== null && high.wattsAvg !== null ? high.wattsAvg - low.wattsAvg : null
+    const delta = rawDelta === null ? null : Math.round(rawDelta * 10) / 10
     const lowWithin = low.wattsAvg !== null ? low.wattsAvg <= LOW * 1.25 : false
     const pass = delta !== null && delta >= 8 && lowWithin
     result.delta = delta
@@ -353,25 +403,14 @@ async function main() {
       result.conclusion = `差值 ${delta}W，未通过判据`
     }
     save(result)
-    process.exit(pass ? 0 : 1)
+    process.exitCode = pass ? 0 : 1
   } catch (e) {
     console.error(`\n失败: ${e.message}`)
     result.error = e.message
     save(result)
-    process.exit(1)
+    process.exitCode = 1
   } finally {
-    if (stopLoad) stopLoad()
-    if (raisedFreqCap) {
-      const r = setMaxFreqAll(cap0.cur)
-      const bad = r.filter((x) => !x.ok)
-      log(`[restore] 频率上限已恢复为 ${cap0.cur} kHz${bad.length ? `（${bad.length} 个失败）` : ''}`)
-    }
-    if (touched) {
-      const restored = setLongShort(restore.long, restore.short)
-      const bad = restored.filter((r) => !r.ok)
-      log(`\n[restore] 已恢复限值 长 ${restore.long}W / 短 ${restore.short}W（来源: ${restore.source}）`)
-      if (bad.length) log(`[restore] 部分失败: ${bad.map((r) => `${r.key}: ${r.message}`).join('; ')}`)
-    }
+    cleanup()
   }
 }
 

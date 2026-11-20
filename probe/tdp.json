@@ -6,29 +6,40 @@
     "low": {
       "target": 45,
       "samples": 20,
-      "wattsAvg": 28.2,
-      "wattsMax": 29.1,
-      "freqAvgMhz": 2379,
-      "tempAvgC": null
+      "wattsAvg": 46,
+      "wattsMax": 46.1,
+      "freqAvgMhz": 3681,
+      "tempAvgC": 66,
+      "usageAvgPct": 100
     },
     "high": {
       "target": 75,
       "samples": 20,
-      "wattsAvg": 27.6,
-      "wattsMax": 27.8,
-      "freqAvgMhz": 2379,
-      "tempAvgC": null
+      "wattsAvg": 76.7,
+      "wattsMax": 76.8,
+      "freqAvgMhz": 4426,
+      "tempAvgC": 82,
+      "usageAvgPct": 100
     }
   },
-  "at": "2026-11-20T08:42:39.237Z",
+  "at": "2026-11-20T08:57:46.000Z",
+  "perfMode": {
+    "label": "性能档",
+    "raw": "0x0751=0x30 0x0727=0x00"
+  },
+  "freqCapBefore": {
+    "cur": 4400000,
+    "hw": 5385000,
+    "policies": 32
+  },
   "restore": {
     "long": 55,
     "short": 75,
     "source": "配置 default"
   },
-  "idleWatts": 16.8,
-  "delta": -0.5999999999999979,
+  "idleWatts": 21.7,
+  "delta": 30.700000000000003,
   "lowWithinLimit": true,
-  "pass": false,
-  "conclusion": "差值 -0.5999999999999979W，未通过判据"
+  "pass": true,
+  "conclusion": "TDP 生效，实测差值 30.700000000000003W"
 }
