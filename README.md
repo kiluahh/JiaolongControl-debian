@@ -74,6 +74,7 @@ sudo ./install.sh
 | 打开外链 | ✅ | 外壳 `shell.openExternal`，只放行 http/https |
 | logo 灯 | ❌ | 寄存器未确认 |
 | GPU 监控 | ✅ | `nvidia-smi` |
+| GPU / 显存最低频率 | ✅ | `nvidia-smi -lgc` / `-lmc <下限>,<驱动上限>`；驱动只认自己的档位（本机显存仅 405/810/9001/11001/12001），写入前吸附并把实际档位回报；`0` = 不限制；实机验证 |
 | GPU 曲线超频 | ❌ | Linux 无 NVAPI VF 曲线接口 |
 | CPU TDP / EDC / 温度墙 / CO | ✅ | 经 `ryzen_smu` 内核模块写 SMU 邮箱，AM5 命令表已验证（status=1）；客观验证见 `probe/tdp.mjs`（RAPL 实测整包功耗） |
 | CPU 整包功耗显示 | ✅ | RAPL `package-0`（`intel_rapl_msr` 在 AMD 上可用），`energy_uj` 差分算瓦数，填充 RyzenSMU 页的 Ppt（原先恒为 0） |
