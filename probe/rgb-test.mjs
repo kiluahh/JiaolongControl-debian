@@ -132,8 +132,11 @@ try {
     }
     await sleep(1500)
     const rb = {mode: ecRead(REG.MODE), r: ecRead(REG.R), g: ecRead(REG.G), b: ecRead(REG.B)}
-    report.steps.push({color: c.name, written: {mode, ...c}, readBack: rb})
-    rec(`  回读 mode=${hex(rb.mode)} rgb=${rb.r},${rb.g},${rb.b}${rb.mode === mode && rb.r === c.r && rb.g === c.g && rb.b === c.b ? '' : ' ⚠️ 与写入不符'}`)
+    report.steps.push({color: c.name, strategy: STRATEGY, written: {mode, ...c}, readBack: rb})
+    // 只有 mode 策略才写了 0x0769-6b，immediate 策略比的是 0x1803/05/08
+    const okMode = rb.mode === (STRATEGY === 'immediate' ? saved.mode : mode)
+    const okRgb = STRATEGY === 'immediate' ? true : rb.r === c.r && rb.g === c.g && rb.b === c.b
+    rec(`  回读 mode=${hex(rb.mode)} rgb=${rb.r},${rb.g},${rb.b}${okMode && okRgb ? '' : ' ⚠️ 与写入不符'}`)
   }
 } catch (e) {
   report.error = String(e.message ?? e)
