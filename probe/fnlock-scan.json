@@ -1,0 +1,76 @@
+{
+  "combo": "Fn+Esc",
+  "eventNode": "/dev/input/event0",
+  "at": "2026-11-20T08:36:27.554Z",
+  "keycodes": [
+    1
+  ],
+  "changeAB": [
+    {
+      "addr": "0x03ca",
+      "before": "0x02",
+      "after": "0x03"
+    },
+    {
+      "addr": "0x0461",
+      "before": "0x50",
+      "after": "0x4e"
+    },
+    {
+      "addr": "0x0648",
+      "before": "0x0a",
+      "after": "0x09"
+    },
+    {
+      "addr": "0x0670",
+      "before": "0x50",
+      "after": "0x4e"
+    },
+    {
+      "addr": "0x068b",
+      "before": "0x01",
+      "after": "0x02"
+    },
+    {
+      "addr": "0x06fa",
+      "before": "0x39",
+      "after": "0x02"
+    },
+    {
+      "addr": "0x075b",
+      "before": "0x50",
+      "after": "0x4e"
+    },
+    {
+      "addr": "0x075c",
+      "before": "0x50",
+      "after": "0x4e"
+    }
+  ],
+  "changeBC": [
+    {
+      "addr": "0x0648",
+      "before": "0x09",
+      "after": "0x0a"
+    },
+    {
+      "addr": "0x068b",
+      "before": "0x02",
+      "after": "0x01"
+    },
+    {
+      "addr": "0x068e",
+      "before": "0x02",
+      "after": "0x01"
+    },
+    {
+      "addr": "0x06fa",
+      "before": "0x02",
+      "after": "0x06"
+    }
+  ],
+  "ecInvolved": true,
+  "hostSeesCombo": true,
+  "conclusion": "EC 参与，候选地址 0x03ca, 0x0461, 0x0648, 0x0670, 0x068b, 0x06fa, 0x075b, 0x075c, 0x068e",
+  "pass": true
+}
