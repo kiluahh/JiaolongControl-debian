@@ -14,7 +14,22 @@ const ROOT = path.resolve(import.meta.dirname, '..')
 const OUT = path.join(ROOT, 'probe', 'rgb-test.json')
 const CALL = '/proc/acpi/call'
 
-const REG = {MODE: 0x0767, R: 0x0769, G: 0x076a, B: 0x076b, BL: 0x078c}
+const REG = {
+  MODE: 0x0767,
+  R: 0x0769,
+  G: 0x076a,
+  B: 0x076b,
+  BL: 0x078c,
+  FEAT0: 0x0765,
+  FEAT1: 0x0766,
+  // immediate 寄存器（uniwill：立即生效）
+  MAX_BL: 0x1801,
+  IMM_R: 0x1803,
+  IMM_G: 0x1805,
+  IMM_B: 0x1808,
+}
+
+const STRATEGY = (process.argv.find((a) => a.startsWith('--strategy=')) || '').slice(11) || 'immediate'
 const APPLY = 0x20 // bit5：应用颜色
 const RAINBOW = 0x80 // bit7：彩虹模式
 
@@ -54,6 +69,10 @@ function restore() {
     ecWrite(REG.R, saved.r)
     ecWrite(REG.G, saved.g)
     ecWrite(REG.B, saved.b)
+    ecWrite(REG.MAX_BL, saved.maxBl)
+    ecWrite(REG.IMM_R, saved.immR)
+    ecWrite(REG.IMM_G, saved.immG)
+    ecWrite(REG.IMM_B, saved.immB)
     ecWrite(REG.MODE, saved.mode)
     rec(`已还原 mode=${hex(saved.mode)} rgb=${saved.r},${saved.g},${saved.b}`)
   } catch (e) {
@@ -81,18 +100,36 @@ try {
     g: ecRead(REG.G),
     b: ecRead(REG.B),
     bl: ecRead(REG.BL),
+    maxBl: ecRead(REG.MAX_BL),
+    immR: ecRead(REG.IMM_R),
+    immG: ecRead(REG.IMM_G),
+    immB: ecRead(REG.IMM_B),
   }
   rec(`原值 mode=${hex(saved.mode)} rgb=${saved.r},${saved.g},${saved.b} brightness=${hex(saved.bl)}`)
+  rec(`features 0x0765=${hex(ecRead(REG.FEAT0))} 0x0766=${hex(ecRead(REG.FEAT1))}`)
+  rec(`immediate 0x1801=${hex(saved.maxBl)} 0x1803=${hex(saved.immR)} 0x1805=${hex(saved.immG)} 0x1808=${hex(saved.immB)}`)
+  rec(`策略: ${STRATEGY}`)
   rec(`  bit5(应用颜色)=${saved.mode & APPLY ? '是' : '否'} bit7(彩虹)=${saved.mode & RAINBOW ? '是' : '否'}`)
 
   for (const c of COLORS) {
     rec(`写入「${c.name}」rgb=${c.r},${c.g},${c.b}`)
-    ecWrite(REG.R, c.r)
-    ecWrite(REG.G, c.g)
-    ecWrite(REG.B, c.b)
-    // 退出彩虹 + 置应用位
-    const mode = (saved.mode & ~RAINBOW) | APPLY
-    ecWrite(REG.MODE, mode)
+    let mode
+    if (STRATEGY === 'immediate') {
+      // 立即生效组：先给最大亮度，再写三色
+      ecWrite(REG.MAX_BL, 0xff)
+      ecWrite(REG.IMM_R, c.r)
+      ecWrite(REG.IMM_G, c.g)
+      ecWrite(REG.IMM_B, c.b)
+      mode = ecRead(REG.MODE)
+    } else {
+      // 模式组：写持久色值，再置 fixed-color 模式 + 应用位
+      ecWrite(REG.R, c.r)
+      ecWrite(REG.G, c.g)
+      ecWrite(REG.B, c.b)
+      ecWrite(REG.MAX_BL, 0xff)
+      mode = (saved.mode & ~RAINBOW) | APPLY | 0x02
+      ecWrite(REG.MODE, mode)
+    }
     await sleep(1500)
     const rb = {mode: ecRead(REG.MODE), r: ecRead(REG.R), g: ecRead(REG.G), b: ecRead(REG.B)}
     report.steps.push({color: c.name, written: {mode, ...c}, readBack: rb})
