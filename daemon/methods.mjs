@@ -460,7 +460,7 @@ export const methods = {
     SetCapsLock: () => fail('由外壳用 X11/Wayland 接口实现'),
     SetNumLock: () => fail('由外壳用 X11/Wayland 接口实现'),
     SetFnLock: () => fail('Fn 锁寄存器尚未确认'),
-    SetTouchpadLock: () => fail('触摸板锁尚未确认'),
+    SetTouchpadLock: () => fail('触摸板锁由外壳写 GNOME 设置（gsettings send-events）'),
   },
 }
 

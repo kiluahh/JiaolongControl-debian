@@ -4,7 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {callDaemon, pingDaemon} from './bridge.mjs'
-import {handleShellCall} from './shellCalls.mjs'
+import {handleShellCall, runGsettings} from './shellCalls.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -94,10 +94,19 @@ function buildTray() {
   }
 }
 
+/** 把事件推给渲染进程：preload 以 WebView2 message 的形式派发，App.vue 监听 'message' */
+function emitToRenderer(payload) {
+  if (!win || win.isDestroyed()) return
+  win.webContents.send('jlc:event', {type: 'message', detail: payload})
+}
+
 ipcMain.handle('jlc:call', async (_e, {group, method, args}) => {
-  // 先看是否该由外壳以用户身份处理（打开链接、音量…），否则转发给 root daemon
+  // 先看是否该由外壳以用户身份处理（打开链接、GNOME 触摸板设置…），否则转发给 root daemon
   const local = await handleShellCall(group, method, args, {
     openExternal: (url) => shell.openExternal(url),
+    callDaemon,
+    runGsettings,
+    emit: emitToRenderer,
   })
   if (local) return local
   const res = await callDaemon(group, method, args)

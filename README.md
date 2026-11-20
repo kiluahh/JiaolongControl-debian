@@ -67,6 +67,11 @@ sudo ./install.sh
 | 风扇手动 / 曲线 | ✅ | `0x1804`/`0x1809` 占空比 0..200 + `0x0751` bit6；已实机验证 |
 | 性能档（平衡/性能/安静） | ✅ | `0x0751` bit4/bit7 + `PMSF()`；实机验证指示灯与风扇同步变化 |
 | 键盘背光 / RGB / 呼吸 | ✅ | `0x078c` bits[7:5]=档位 0–4（0=关，写入须带 apply 位 `0x10`）；`0x0769-6b` RGB 通道 0–50 + `0x0767` 触发；`0x0767` bit7=呼吸。协议取自 TUXEDO GPL 驱动并本机实测复核；逐键 RGB 需 ITE HID，本机无此设备 |
+| 大写/数字锁状态 | ✅ | 读 `/sys/class/leds/input*::capslock\|numlock`；优先内置键盘（`AT Translated Set 2`）——Wayland 下 mutter 只给事件源键盘更新 LED，外接键盘的 LED 可能是脏的。实机验证 `false→true→false` |
+| 触摸板锁 | ✅ | 外壳以用户身份写 `gsettings org.gnome.desktop.peripherals.touchpad send-events`，写入后回读校验，成功后推送 `lock-states-changed` |
+| 大写/数字锁「切换」 | ❌ | 需要注入按键（GNOME Wayland 不支持 wtype 的虚拟键盘协议，得走 ydotool/uinput） |
+| Fn 锁 | ❌ | 寄存器 `0x074e` bit4（TUXEDO `uniwill_keyboard.h`），本机待验证 |
+| 打开外链 | ✅ | 外壳 `shell.openExternal`，只放行 http/https |
 | logo 灯 | ❌ | 寄存器未确认 |
 | GPU 监控 | ✅ | `nvidia-smi` |
 | GPU 曲线超频 | ❌ | Linux 无 NVAPI VF 曲线接口 |
