@@ -19,7 +19,6 @@ export const useLocksStore = defineStore('locks', {
       this.locks = {
         CapsLock: data.CapsLock ?? cur?.CapsLock ?? false,
         NumLock: data.NumLock ?? cur?.NumLock ?? false,
-        FnLock: data.FnLock ?? cur?.FnLock ?? null,
         TouchpadLock: data.TouchpadLock ?? cur?.TouchpadLock ?? null,
       }
     },

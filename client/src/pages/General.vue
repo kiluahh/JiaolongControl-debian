@@ -10,13 +10,12 @@ import GPUDirectConnection from './Settings/components/GPUDirectConnection.vue'
 // ===== 锁定控制: 四项锁定状态 =====
 // CapsLock/NumLock: daemon 读键盘 LED 真值; TouchpadLock: 外壳读 GNOME 设置。
 // 页面挂载期间轮询刷新(用户直接按物理键时面板也要跟上), 主动切换后另有 lock-states-changed 推送
-type LockKey = 'CapsLock' | 'NumLock' | 'FnLock' | 'TouchpadLock'
+type LockKey = 'CapsLock' | 'NumLock' | 'TouchpadLock'
 const locksStore = useLocksStore()
 const locks = computed(() => locksStore.locks)
 const lockItems: Array<{ key: LockKey; label: string; hint: string }> = [
   { key: 'CapsLock', label: '大写键锁定', hint: '显示键盘 LED 状态 · 按物理键切换' },
   { key: 'NumLock', label: '数字键锁定', hint: '显示键盘 LED 状态 · 按物理键切换' },
-  { key: 'FnLock', label: '功能键锁定', hint: '待接入 · 显示为未知' },
   { key: 'TouchpadLock', label: '触摸板锁定', hint: '经 GNOME 设置切换' },
 ]
 
@@ -40,7 +39,6 @@ function lockStateText(key: LockKey) {
 const lockSetters: Record<LockKey, (v: boolean) => Promise<CommandResult<void>>> = {
   CapsLock: Osd.SetCapsLock,
   NumLock: Osd.SetNumLock,
-  FnLock: Osd.SetFnLock,
   TouchpadLock: Osd.SetTouchpadLock,
 }
 
@@ -118,7 +116,7 @@ onUnmounted(() => {
               </button>
             </div>
             <p class="text-[10px] text-gray-600 leading-relaxed">
-              大写/数字锁只能显示键盘 LED 真值，切换请按物理键；触摸板锁写 GNOME 设置；功能键锁待接入（显示为未知）
+              大写/数字锁只能显示键盘 LED 真值，切换请按物理键；触摸板锁写 GNOME 设置
             </p>
           </div>
 
@@ -146,10 +144,6 @@ onUnmounted(() => {
               <p>
                 <strong>大写/数字键锁定</strong>: 读取键盘 LED 状态，与物理指示灯一致；面板不模拟按键
                 （Wayland 下需注入按键事件，暂未实现）。
-              </p>
-              <p>
-                <strong>功能键锁定 (Fn Lock)</strong>: 切换 F1-F12 与媒体功能键的默认行为。EC 寄存器
-                0x074e bit4 已定位，本机尚未验证。
               </p>
               <p>
                 <strong>触摸板锁定</strong>: 通过 GNOME 设置（gsettings send-events）禁用/启用触摸板，

@@ -108,7 +108,6 @@ export interface OsdLockStates {
   CapsLock: boolean
   NumLock: boolean
   /** EC 读取失败时为 null (未知) */
-  FnLock: boolean | null
   /** EC 读取失败时为 null (未知) */
   TouchpadLock: boolean | null
 }
@@ -232,7 +231,6 @@ export interface BridgeApi {
     GetLockStates(): HostBridgePromise<OsdLockStates>
     SetCapsLock(enabled: boolean): HostBridgePromise<void>
     SetNumLock(enabled: boolean): HostBridgePromise<void>
-    SetFnLock(enabled: boolean): HostBridgePromise<void>
     SetTouchpadLock(enabled: boolean): HostBridgePromise<void>
   }
 }
@@ -467,7 +465,6 @@ export const Osd = {
   GetLockStates: () => call(raw.Osd.GetLockStates()),
   SetCapsLock: (enabled: boolean) => call(raw.Osd.SetCapsLock(enabled)),
   SetNumLock: (enabled: boolean) => call(raw.Osd.SetNumLock(enabled)),
-  SetFnLock: (enabled: boolean) => call(raw.Osd.SetFnLock(enabled)),
   SetTouchpadLock: (enabled: boolean) => call(raw.Osd.SetTouchpadLock(enabled)),
 }
 

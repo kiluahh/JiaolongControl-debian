@@ -70,7 +70,6 @@ sudo ./install.sh
 | 大写/数字锁状态 | ✅ | 读 `/sys/class/leds/input*::capslock\|numlock`；优先内置键盘（`AT Translated Set 2`）——Wayland 下 mutter 只给事件源键盘更新 LED，外接键盘的 LED 可能是脏的。实机验证 `false→true→false` |
 | 触摸板锁 | ✅ | 外壳以用户身份写 `gsettings org.gnome.desktop.peripherals.touchpad send-events`，写入后回读校验，成功后推送 `lock-states-changed` |
 | 大写/数字锁「切换」 | ❌ 不做 | 已评估 uinput 虚拟键盘注入方案，决定跳过；面板点击改为提示按物理键 |
-| Fn 锁 | ❌ | 寄存器 `0x074e` bit4（TUXEDO `uniwill_keyboard.h`），本机待验证 |
 | 系统音量 / 静音 | ✅ | 外壳经 `wpctl` 控制默认输出设备（PipeWire），写入后回读校验 |
 | 打开外链 | ✅ | 外壳 `shell.openExternal`，只放行 http/https |
 | logo 灯 | ❌ | 寄存器未确认 |

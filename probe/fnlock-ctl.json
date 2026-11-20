@@ -1,0 +1,412 @@
+{
+  "eventNode": "/dev/input/event0",
+  "steps": {
+    "单按Esc": {
+      "keycodes": [
+        1
+      ],
+      "keys": "ESC(1)",
+      "changes": [
+        {
+          "addr": "0x0025",
+          "before": "0x12",
+          "after": "0x08"
+        },
+        {
+          "addr": "0x03a5",
+          "before": "0xa5",
+          "after": "0xe5"
+        },
+        {
+          "addr": "0x0606",
+          "before": "0x20",
+          "after": "0x1c"
+        },
+        {
+          "addr": "0x0610",
+          "before": "0xfb",
+          "after": "0xdf"
+        },
+        {
+          "addr": "0x068b",
+          "before": "0x02",
+          "after": "0x00"
+        },
+        {
+          "addr": "0x068d",
+          "before": "0x02",
+          "after": "0x00"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x11",
+          "after": "0x17"
+        }
+      ]
+    },
+    "单按F6": {
+      "keycodes": [
+        64
+      ],
+      "keys": "F6(64)",
+      "changes": [
+        {
+          "addr": "0x0025",
+          "before": "0x08",
+          "after": "0x07"
+        },
+        {
+          "addr": "0x03a5",
+          "before": "0xe5",
+          "after": "0xc5"
+        },
+        {
+          "addr": "0x0461",
+          "before": "0x50",
+          "after": "0x4e"
+        },
+        {
+          "addr": "0x0610",
+          "before": "0xdf",
+          "after": "0xff"
+        },
+        {
+          "addr": "0x0670",
+          "before": "0x50",
+          "after": "0x4e"
+        },
+        {
+          "addr": "0x068b",
+          "before": "0x00",
+          "after": "0x04"
+        },
+        {
+          "addr": "0x068d",
+          "before": "0x00",
+          "after": "0x04"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x17",
+          "after": "0x1e"
+        },
+        {
+          "addr": "0x075b",
+          "before": "0x50",
+          "after": "0x4f"
+        },
+        {
+          "addr": "0x075c",
+          "before": "0x50",
+          "after": "0x4f"
+        }
+      ]
+    },
+    "FnF6": {
+      "keycodes": [
+        28
+      ],
+      "keys": "CODE_28(28)",
+      "changes": [
+        {
+          "addr": "0x0025",
+          "before": "0x07",
+          "after": "0x0f"
+        },
+        {
+          "addr": "0x00d8",
+          "before": "0x04",
+          "after": "0x06"
+        },
+        {
+          "addr": "0x00d9",
+          "before": "0x04",
+          "after": "0x06"
+        },
+        {
+          "addr": "0x00df",
+          "before": "0x44",
+          "after": "0x46"
+        },
+        {
+          "addr": "0x03a5",
+          "before": "0xc5",
+          "after": "0xa5"
+        },
+        {
+          "addr": "0x0461",
+          "before": "0x4e",
+          "after": "0x4c"
+        },
+        {
+          "addr": "0x0602",
+          "before": "0xef",
+          "after": "0xf0"
+        },
+        {
+          "addr": "0x0610",
+          "before": "0xff",
+          "after": "0xfb"
+        },
+        {
+          "addr": "0x0670",
+          "before": "0x4e",
+          "after": "0x4c"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x1e",
+          "after": "0x31"
+        },
+        {
+          "addr": "0x075b",
+          "before": "0x4f",
+          "after": "0x4c"
+        },
+        {
+          "addr": "0x075c",
+          "before": "0x4f",
+          "after": "0x4c"
+        },
+        {
+          "addr": "0x078c",
+          "before": "0x40",
+          "after": "0x00"
+        }
+      ]
+    },
+    "FnEsc": {
+      "keycodes": [
+        1
+      ],
+      "keys": "ESC(1)",
+      "changes": [
+        {
+          "addr": "0x0025",
+          "before": "0x0f",
+          "after": "0x06"
+        },
+        {
+          "addr": "0x0602",
+          "before": "0xf0",
+          "after": "0xf2"
+        },
+        {
+          "addr": "0x0606",
+          "before": "0x1c",
+          "after": "0x1e"
+        },
+        {
+          "addr": "0x0610",
+          "before": "0xfb",
+          "after": "0xff"
+        },
+        {
+          "addr": "0x068b",
+          "before": "0x04",
+          "after": "0x02"
+        },
+        {
+          "addr": "0x068d",
+          "before": "0x04",
+          "after": "0x02"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x31",
+          "after": "0x3d"
+        }
+      ]
+    },
+    "Settle": {
+      "changes": [
+        {
+          "addr": "0x03a5",
+          "before": "0xa5",
+          "after": "0x85"
+        },
+        {
+          "addr": "0x0606",
+          "before": "0x1e",
+          "after": "0x1d"
+        },
+        {
+          "addr": "0x068b",
+          "before": "0x02",
+          "after": "0x04"
+        },
+        {
+          "addr": "0x068d",
+          "before": "0x02",
+          "after": "0x04"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x3d",
+          "after": "0x42"
+        }
+      ]
+    },
+    "FnEsc2": {
+      "keycodes": [
+        1
+      ],
+      "keys": "ESC(1)",
+      "changes": [
+        {
+          "addr": "0x0025",
+          "before": "0x06",
+          "after": "0x05"
+        },
+        {
+          "addr": "0x03a5",
+          "before": "0x85",
+          "after": "0xc5"
+        },
+        {
+          "addr": "0x0602",
+          "before": "0xf2",
+          "after": "0xf3"
+        },
+        {
+          "addr": "0x0608",
+          "before": "0x9d",
+          "after": "0x9e"
+        },
+        {
+          "addr": "0x068b",
+          "before": "0x04",
+          "after": "0x03"
+        },
+        {
+          "addr": "0x068d",
+          "before": "0x04",
+          "after": "0x03"
+        },
+        {
+          "addr": "0x06d4",
+          "before": "0x42",
+          "after": "0x46"
+        }
+      ]
+    }
+  },
+  "at": "2026-11-20T08:37:53.762Z",
+  "matrix": {
+    "0x0025": {
+      "esc": true,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": true,
+      "instant": false
+    },
+    "0x00d8": {
+      "esc": false,
+      "f6": false,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x00d9": {
+      "esc": false,
+      "f6": false,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x00df": {
+      "esc": false,
+      "f6": false,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x03a5": {
+      "esc": true,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": true
+    },
+    "0x0461": {
+      "esc": false,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x0602": {
+      "esc": false,
+      "f6": false,
+      "fnf6": true,
+      "fnEsc": true,
+      "instant": false
+    },
+    "0x0606": {
+      "esc": true,
+      "f6": false,
+      "fnf6": false,
+      "fnEsc": true,
+      "instant": true
+    },
+    "0x0610": {
+      "esc": true,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": true,
+      "instant": false
+    },
+    "0x0670": {
+      "esc": false,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x068b": {
+      "esc": true,
+      "f6": true,
+      "fnf6": false,
+      "fnEsc": true,
+      "instant": true
+    },
+    "0x068d": {
+      "esc": true,
+      "f6": true,
+      "fnf6": false,
+      "fnEsc": true,
+      "instant": true
+    },
+    "0x06d4": {
+      "esc": true,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": true,
+      "instant": true
+    },
+    "0x075b": {
+      "esc": false,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x075c": {
+      "esc": false,
+      "f6": true,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    },
+    "0x078c": {
+      "esc": false,
+      "f6": false,
+      "fnf6": true,
+      "fnEsc": false,
+      "instant": false
+    }
+  },
+  "candidates": [],
+  "conclusion": "EC 中没有稳定的 Fn 锁状态位",
+  "pass": false
+}
