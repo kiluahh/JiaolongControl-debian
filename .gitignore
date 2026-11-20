@@ -14,3 +14,5 @@ app/node_modules/
 .run/
 client/dist/
 app/.electron-cache/
+probe/mode-test.json
+probe/mode-test.txt
