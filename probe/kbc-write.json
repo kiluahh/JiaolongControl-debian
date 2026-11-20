@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "at": "2026-11-20T07:24:13.806Z",
+  "reg": "0x78c",
+  "original": 128,
+  "results": [
+    {
+      "value": 0,
+      "readback": 0,
+      "accepted": true,
+      "observed": ""
+    },
+    {
+      "value": 32,
+      "readback": 32,
+      "accepted": true,
+      "observed": ""
+    },
+    {
+      "value": 64,
+      "readback": 64,
+      "accepted": true,
+      "observed": ""
+    },
+    {
+      "value": 96,
+      "readback": 96,
+      "accepted": true,
+      "observed": ""
+    },
+    {
+      "value": 128,
+      "readback": 128,
+      "accepted": true,
+      "observed": ""
+    }
+  ]
+}

@@ -2,7 +2,6 @@ import {defineStore} from 'pinia'
 import HOME from '@/assets/icon/HOME.png'
 import CPU from '@/assets/icon/CPU.png'
 import Fan from '@/assets/icon/Fan.png'
-import Keyboard from '@/assets/icon/Keyboard.png'
 import Settings from '@/assets/icon/Settings.png'
 import Settings2 from '@/assets/icon/Settings2.png'
 import AMD from '@/assets/icon/AMD.png'
@@ -12,7 +11,6 @@ import OSD from '@/assets/icon/Monitoring.png'
 import HOME_Page from '@/pages/Home.vue'
 import CPU_Page from '@/pages/CPU.vue'
 import Fan_Page from '@/pages/Fan.vue'
-import Keyboard_Page from '@/pages/KeyBoard.vue'
 import Settings_Page from '@/pages/Settings.vue'
 import GPU_Page from '@/pages/GPU.vue'
 import RyzenSmu_Page from '@/pages/RyzenSmu.vue'
@@ -55,7 +53,6 @@ export const HomeCardType = [
   { title: 'Ryzen SMU', icon: AMD, page: RyzenSmu_Page },
   { title: '风扇曲线', icon: FanCurve, page: FanCurveEditor },
   { title: '风扇', icon: Fan, page: Fan_Page },
-  { title: '键盘', icon: Keyboard, page: Keyboard_Page },
   { title: 'OSD', icon: OSD, page: Osd_Page },
   { title: '常规设置', icon: Settings2, page: General_Page },
   { title: '设置', icon: Settings, page: Settings_Page },

@@ -1,0 +1,82 @@
+{
+  "schema": 3,
+  "at": "2026-11-20T07:41:34.647Z",
+  "literal": {
+    "OFF": 2,
+    "ON": 0,
+    "BREATH": 128,
+    "STATIC": 0
+  },
+  "results": [
+    {
+      "name": "确保亮灯",
+      "answer": "BL=0x00 有效",
+      "pass": true
+    },
+    {
+      "name": "呼吸灯效：MODE = 0x80",
+      "answer": "y",
+      "pass": true,
+      "bl": 0,
+      "mode": 128,
+      "rgb": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "固定红色：RGB + MODE=0x00",
+      "answer": "n",
+      "pass": false,
+      "bl": 0,
+      "mode": 0,
+      "rgb": [
+        255,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "固定绿色：RGB + MODE=0x00",
+      "answer": "",
+      "pass": false,
+      "bl": 0,
+      "mode": 0,
+      "rgb": [
+        0,
+        255,
+        0
+      ]
+    },
+    {
+      "name": "固定蓝色：RGB + MODE=0x00",
+      "answer": "",
+      "pass": false,
+      "bl": 0,
+      "mode": 0,
+      "rgb": [
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "name": "亮度档位读取",
+      "answer": "0,2,3,4",
+      "pass": true
+    },
+    {
+      "name": "关灯：BL = 0x02",
+      "answer": "n",
+      "pass": false,
+      "bl": 2,
+      "mode": 0,
+      "rgb": [
+        0,
+        0,
+        255
+      ]
+    }
+  ]
+}

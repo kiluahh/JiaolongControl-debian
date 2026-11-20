@@ -21,7 +21,6 @@ export const DEFAULTS = {
     BootAdvancedGPUSystem: false,
     BootSetRyzenSmuCurveOptimizerAll: false,
     BootSetRyzenSmuCurveOptimizerPerCore: false,
-    BootKeyboardGradient: false,
     CpuCurveOptimizerPerCore: false,
     BootGpuUseAdvancedOffsets: false,
     Theme: 'system',

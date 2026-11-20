@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "at": "2026-11-20T07:36:18.608Z",
+  "initial": 128,
+  "tried": [
+    {
+      "step": 1,
+      "why": "清 bit1，保留其它位（0x80）",
+      "readback": 128,
+      "lit": true,
+      "answer": "y"
+    }
+  ]
+}

@@ -80,41 +80,6 @@ function interpolate(points, temp) {
   return pts[pts.length - 1].speed
 }
 
-// ── 键盘渐变 ────────────────────────────────────────────────────────────────
-const gradient = {
-  timer: null,
-  running: false,
-  hue: 0,
-  start() {
-    if (this.timer) return
-    this.running = true
-    this.timer = setInterval(() => {
-      this.hue = (this.hue + 4) % 360
-      const {r, g, b} = hslToRgb(this.hue / 360, 1, 0.5)
-      ecGuard(() => {
-        ec.writeByte(REG.KBD_RGB_R, r)
-        ec.writeByte(REG.KBD_RGB_G, g)
-        ec.writeByte(REG.KBD_RGB_B, b)
-        ec.updateBit(REG.KBD_RGB_MODE, 0x20, true)
-      }, '键盘渐变')
-    }, 120)
-  },
-  stop() {
-    this.running = false
-    if (this.timer) clearInterval(this.timer)
-    this.timer = null
-  },
-}
-
-function hslToRgb(h, s, l) {
-  const f = (n) => {
-    const k = (n + h * 12) % 12
-    const a = s * Math.min(l, 1 - l)
-    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))))
-  }
-  return {r: f(0), g: f(8), b: f(4)}
-}
-
 // ── 方法表 ──────────────────────────────────────────────────────────────────
 export const methods = {
   Sys: {
@@ -195,31 +160,6 @@ export const methods = {
       }, '设置性能模式'),
   },
 
-  Keyboard: {
-    GetColor: () =>
-      ecGuard(
-        () => ok({red: ec.readByte(REG.KBD_RGB_R), green: ec.readByte(REG.KBD_RGB_G), blue: ec.readByte(REG.KBD_RGB_B)}),
-        '读取键盘颜色',
-      ),
-    SetColor: (r, g, b) =>
-      ecGuard(() => {
-        ec.writeByte(REG.KBD_RGB_R, Number(r) & 0xff)
-        ec.writeByte(REG.KBD_RGB_G, Number(g) & 0xff)
-        ec.writeByte(REG.KBD_RGB_B, Number(b) & 0xff)
-        ec.updateBit(REG.KBD_RGB_MODE, 0x20, true) // bit5 = 应用颜色
-        return ok(undefined, '颜色已应用')
-      }, '设置键盘颜色'),
-    // 0x078c 是命令寄存器：bit1=电源位。0x02 关灯、0x00 开灯（实机验证）。
-    // 无明暗分级、无颜色控制——本机固件不通过这个寄存器暴露它们。
-    GetLightBrightness: () => ecGuard(() => ok(ec.readByte(REG.KBD_BL_STATUS) & 0x02 ? 0 : 3), '读取键盘背光'),
-    SetLightBrightness: (br) =>
-      ecGuard(() => {
-        const level = Number(br)
-        ec.writeByte(REG.KBD_BL_STATUS, level > 0 ? 0x00 : 0x02)
-        return ok(undefined, level > 0 ? '键盘背光已打开' : '键盘背光已关闭')
-      }, '设置键盘背光'),
-  },
-
   LogoLight: {
     Get: () => fail('logo 灯寄存器尚未确认'),
     Set: () => fail('logo 灯寄存器尚未确认'),
@@ -278,18 +218,6 @@ export const methods = {
       return ok(undefined, '自动风扇已停止')
     },
     IsRunning: () => ok(autoFan.running),
-  },
-
-  KeyboardGradient: {
-    Start: () => {
-      gradient.start()
-      return ok(undefined, '键盘渐变已启动')
-    },
-    Stop: () => {
-      gradient.stop()
-      return ok(undefined, '键盘渐变已停止')
-    },
-    IsRunning: () => ok(gradient.running),
   },
 
   NvidiaGpu: {

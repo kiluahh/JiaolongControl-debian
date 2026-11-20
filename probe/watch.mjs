@@ -35,7 +35,9 @@ const WATCH = ADDRS
 function read(addr) {
   fs.writeFileSync(CALL, `\\_SB.INOU.ECRR 0x${addr.toString(16)}`)
   const t = fs.readFileSync(CALL, 'utf8').replace(/\0/g, '').trim()
-  const m = t.match(/^0x([0-9a-fA-F]+)$/)
+  // 只接受单字节：EC 忙时 ECRR 会返回 0xfffffffffffffffe 之类的垃圾，
+  // 若不校验就会把垃圾当成真实寄存器值打印出来（曾误报 0xfffffffe / 0xInfinity）。
+  const m = t.match(/^0x([0-9a-fA-F]{1,2})$/)
   return m ? parseInt(m[1], 16) : null
 }
 
